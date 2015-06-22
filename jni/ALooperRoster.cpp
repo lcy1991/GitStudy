@@ -61,7 +61,7 @@ void ALooperRoster::unregisterHandler(handler_id handlerID) {
 }
 
 void ALooperRoster::postMessage(
-        AMessage *msg, int64_t delayUs) {
+        AMessage *msg, int64_t delayUs) {    
     Mutex::Autolock autoLock(mLock);
 	ALooper* looper;
     map<handler_id, HandlerInfo>::iterator iter;
@@ -102,8 +102,7 @@ void ALooperRoster::deliverMessage(AMessage* msg) {
 	else{
 		LOGW(LOG_TAG,"failed to deliver message. Target handler not registered.");
     	return;
-	}	
-
+	}
 }
 
 ALooper* ALooperRoster::findLooper(handler_id handlerID) {
@@ -123,3 +122,12 @@ ALooper* ALooperRoster::findLooper(handler_id handlerID) {
         return NULL;
 
 }
+
+
+
+
+
+
+
+
+

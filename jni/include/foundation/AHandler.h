@@ -38,6 +38,10 @@ struct AHandler{
     ALooper* looper();
 
 protected:
+/*****************************************************
+WARNING:Do not post message in onMessageReceived, 
+it will Deadlock in ALooperRoster::postMessage()
+******************************************************/
     virtual void onMessageReceived(AMessage* msg) = 0;
 
 private:
