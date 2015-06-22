@@ -17,6 +17,7 @@ int main()
 		{
 			handler1->start(0,2*i);
 			handler2->start(0,2*i+1);
+			usleep(1000);
 		}
 
 	return 0;
@@ -24,4 +25,4 @@ int main()
 
 
 
-
+
