@@ -23,6 +23,8 @@
 #include "foundation/AString.h"
 #ifdef ANDROID
 #include <android/log.h>
+#else
+#include <stdio.h>
 #endif
 
 
