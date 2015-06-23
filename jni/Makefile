@@ -19,7 +19,7 @@ endif
 INCLUDES= -I./include/
 LDLIBS= -lpthread
 test:test.cpp libstagefright_foundation.so
-	$(CC)  $(FLAG64) $(CFLAGS) $(INCLUDES) test.cpp -L. -lstagefright_foundation -lpthread -o test
+	$(CC)  $(FLAG64) $(CFLAGS) $(INCLUDES) test.cpp  libstagefright_foundation.so -lpthread -o test
 libstagefright_foundation.so:$(OBJ)
 	$(CC) -shared  $(FLAG64) $(LDLIBS) $(OBJ) -o libstagefright_foundation.so 	
 $(OBJ): %.o: %.cpp
