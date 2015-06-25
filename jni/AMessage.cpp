@@ -159,14 +159,14 @@ void AMessage::setString(
     if (obj != NULL) { obj->incStrong(this); }
     item->u.refValue = obj.get();
 }
-
-void AMessage::setMessage(const char *name, const AMessage &obj) {
+*/
+void AMessage::setMessage(const char *name, const sp<AMessage> &obj) {
     Item *item = allocateItem(name);
     item->mType = kTypeMessage;
 
-    if (obj != NULL) { obj->incStrong(this); }
-    item->u.refValue = obj.get();
-}*/
+    if (obj != NULL)
+    item->u.msgValue = obj.get();
+}
 
 bool AMessage::findString(const char *name, AString *value) const {
     const Item *item = findItem(name, kTypeString);
@@ -184,16 +184,16 @@ bool AMessage::findObject(const char *name, sp<RefBase> *obj) const {
         return true;
     }
     return false;
-}
+}*/
 
-bool AMessage::findMessage(const char *name, AMessage *obj) const {
+bool AMessage::findMessage(const char *name,sp<AMessage> *obj) const {
     const Item *item = findItem(name, kTypeMessage);
     if (item) {
-        *obj = static_cast<AMessage *>(item->u.refValue);
+        *obj = static_cast<AMessage *>(item->u.msgValue);
         return true;
     }
     return false;
-}*/
+}
 
 void AMessage::post(int64_t delayUs) {
     extern ALooperRoster gLooperRoster;

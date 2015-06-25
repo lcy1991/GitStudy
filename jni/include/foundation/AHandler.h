@@ -19,6 +19,7 @@
 #define A_HANDLER_H_
 
 #include "foundation/ALooper.h"
+#include "foundation/StrongPointer.h"
 #include <stdint.h>
 
 typedef int32_t handler_id;
@@ -42,7 +43,7 @@ protected:
 WARNING:Do not post message in onMessageReceived, 
 it will Deadlock in ALooperRoster::postMessage()
 ******************************************************/
-    virtual void onMessageReceived(AMessage* msg) = 0;
+    virtual void onMessageReceived(const sp<AMessage> &msg) = 0;
 
 private:
     friend struct ALooperRoster;

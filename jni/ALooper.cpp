@@ -82,7 +82,7 @@ status_t ALooper::stop(){
 }
 
 
-void ALooper::post(AMessage* msg, int64_t delayUs) {
+void ALooper::post(const sp<AMessage> &msg, int64_t delayUs) {
     Mutex::Autolock autoLock(mLock);
 
     int64_t whenUs;

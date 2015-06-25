@@ -12,8 +12,12 @@ public:
 };
 
 int main()
-{{
-sp<AAA> AObj = new AAA();}
+{
+	sp<AAA> AAAp;
+	{
+		sp<AAA> AObj = new AAA();
+		AAAp = AObj;
+	}
 	printf("exit\n");
 	return 0;
 }

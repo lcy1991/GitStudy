@@ -21,6 +21,7 @@
 
 #include "foundation/ALooper.h"
 #include "foundation/Mutex.h"
+#include "foundation/StrongPointer.h"
 #include <map>
 using namespace std;
 
@@ -33,8 +34,8 @@ struct ALooperRoster {
 
     void unregisterHandler(handler_id handlerID);
 
-    void postMessage(AMessage* msg, int64_t delayUs = 0);
-    void deliverMessage(AMessage* msg);
+    void postMessage(const sp<AMessage> &msg, int64_t delayUs = 0);
+    void deliverMessage(const sp<AMessage> &msg);
 
     ALooper* findLooper(handler_id handlerID);
 

@@ -20,13 +20,16 @@
 
 #include "foundation/ABase.h"
 #include "foundation/ALooper.h"
+#include "foundation/LightRefBase.h"
+#include "foundation/StrongPointer.h"
+
 #include <stdint.h>
 #include <sys/types.h>
 typedef int32_t handler_id;
 
 struct AString;
 
-struct AMessage{             
+struct AMessage :public LightRefBase<AMessage>{             
     AMessage (uint32_t what = 0, handler_id target = 0);
 
     void setWhat(uint32_t what);
@@ -43,7 +46,7 @@ struct AMessage{
     void setPointer(const char *name, void *value);
     void setString(const char *name, const char *s, ssize_t len = -1);
 //    void setObject(const char *name, const sp<RefBase> &obj);
-//    void setMessage(const char *name, const AMessage &obj);
+    void setMessage(const char *name, const sp<AMessage> &obj);
 
     bool findInt32(const char *name, int32_t *value) const;
     bool findInt64(const char *name, int64_t *value) const;
@@ -53,7 +56,7 @@ struct AMessage{
     bool findPointer(const char *name, void **value) const;
     bool findString(const char *name, AString *value) const;
 //    bool findObject(const char *name, sp<RefBase> *obj) const;
-//    bool findMessage(const char *name, sp<AMessage> *obj) const;
+    bool findMessage(const char *name, sp<AMessage> *obj) const;
 
     void post(int64_t delayUs = 0);
 
@@ -62,7 +65,7 @@ struct AMessage{
     AString debugString(int32_t indent = 0) const;
 
 
-protected:
+//protected:
     virtual ~AMessage();
 
 private:
@@ -90,6 +93,7 @@ private:
             double doubleValue;
             void *ptrValue;
             AString *stringValue;
+			AMessage *msgValue;
         } u;
         const char *mName;
         Type mType;

@@ -61,7 +61,7 @@ void ALooperRoster::unregisterHandler(handler_id handlerID) {
 }
 
 void ALooperRoster::postMessage(
-        AMessage *msg, int64_t delayUs) {    
+        const sp<AMessage> &msg, int64_t delayUs) {    
     Mutex::Autolock autoLock(mLock);
 	ALooper* looper;
     map<handler_id, HandlerInfo>::iterator iter;
@@ -83,7 +83,7 @@ void ALooperRoster::postMessage(
 	}
 }
 
-void ALooperRoster::deliverMessage(AMessage* msg) {
+void ALooperRoster::deliverMessage(const sp<AMessage> &msg) {
     AHandler* handler;
     Mutex::Autolock autoLock(mLock);
     map<handler_id, HandlerInfo>::iterator iter;

@@ -19,15 +19,14 @@
 #define A_LOOPER_H_
 #include "foundation/AMessage.h"
 #include "foundation/AHandler.h"
-
+#include "foundation/StrongPointer.h"
 #include "foundation/ABase.h"
 #include "foundation/AString.h"
 #include "foundation/Errors.h"
-
-
+#include "foundation/Mutex.h"
 #include <list>
 #include <pthread.h>
-#include "foundation/Mutex.h"
+
 
 using namespace std;
 
@@ -64,7 +63,7 @@ private:
 
     struct Event {
         int64_t mWhenUs;
-        AMessage* mMessage;
+        sp<AMessage> mMessage;
     };
 
     Mutex mLock;
@@ -77,7 +76,7 @@ private:
 
 	bool mIsRunning;
 
-    void post(AMessage* msg, int64_t delayUs);
+    void post(const sp<AMessage> &msg, int64_t delayUs);
 	bool threadloop();
     static void* loop(void* arg);
 
