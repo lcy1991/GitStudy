@@ -61,10 +61,11 @@ void ALooperRoster::unregisterHandler(handler_id handlerID) {
 }
 
 void ALooperRoster::postMessage(
-        const sp<AMessage> &msg, int64_t delayUs) {    
-    Mutex::Autolock autoLock(mLock);
+        const sp<AMessage> &msg, int64_t delayUs) {
 	ALooper* looper;
     map<handler_id, HandlerInfo>::iterator iter;
+{
+    Mutex::Autolock autoLock(mLock);	
 	iter = mHandlers.find(msg->target());
 	if(iter != mHandlers.end()){
 		looper = iter->second.mLooper;
@@ -75,18 +76,20 @@ void ALooperRoster::postMessage(
 	        mHandlers.erase(iter);
 	        return;
 		}
-		looper->post(msg, delayUs);
 	}
 	else{
 		LOGW(LOG_TAG,"failed to post message. Target handler not registered.");
     	return;
 	}
+}	
+	looper->post(msg, delayUs);	
 }
 
 void ALooperRoster::deliverMessage(const sp<AMessage> &msg) {
     AHandler* handler;
-    Mutex::Autolock autoLock(mLock);
     map<handler_id, HandlerInfo>::iterator iter;
+{
+	Mutex::Autolock autoLock(mLock);
 	iter = mHandlers.find(msg->target());
 	if(iter != mHandlers.end()){
 		handler = iter->second.mHandler;
@@ -97,12 +100,13 @@ void ALooperRoster::deliverMessage(const sp<AMessage> &msg) {
 	        mHandlers.erase(iter);
 	        return;
 		}
-		handler->onMessageReceived(msg);
 	}
 	else{
 		LOGW(LOG_TAG,"failed to deliver message. Target handler not registered.");
     	return;
 	}
+}	
+	handler->onMessageReceived(msg);
 }
 
 ALooper* ALooperRoster::findLooper(handler_id handlerID) {

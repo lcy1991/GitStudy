@@ -26,4 +26,4 @@ $(OBJ): %.o: %.cpp
 	$(CC) -c $(FLAG64) $(CFLAGS) $(INCLUDES) $< -o $@
 .PHONY:clean
 clean:
-	rm -f *.o libstagefright_foundation.so
+	rm -f *.o libstagefright_foundation.so test

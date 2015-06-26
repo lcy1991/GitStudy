@@ -54,7 +54,6 @@ public:
 
     static int64_t GetNowUs();
 
-protected:
 
     virtual ~ALooper();
 

@@ -32,6 +32,7 @@ AMessage::AMessage(uint32_t what, handler_id target)
 
 AMessage::~AMessage() {
     clear();
+//	LOGI("tag","msg is delete\n");
 }
 
 void AMessage::setWhat(uint32_t what) {

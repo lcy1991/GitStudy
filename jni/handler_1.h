@@ -9,7 +9,7 @@ struct handler_1 : AHandler
 	void start(uint32_t mWhat,uint32_t startNum);
 	void setTarget(handler_id Target);
 protected:
-    virtual void onMessageReceived(AMessage* msg);
+    virtual void onMessageReceived(const sp<AMessage> &msg);
 	uint32_t mhello_count;
 	handler_id mTarget;
 };

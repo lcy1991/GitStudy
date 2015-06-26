@@ -1,5 +1,6 @@
 #include "handler_1.h"
 #include "foundation/ADebug.h"
+#include "foundation/StrongPointer.h"
 #define LOG_TAG __FILE__
 
 
@@ -20,23 +21,25 @@ void handler_1::setTarget(handler_id Target)
 void handler_1::start(uint32_t mWhat,uint32_t startNum)
 {
 	
-	AMessage* msg = new AMessage(mWhat, mTarget);
+	sp<AMessage> msg = new AMessage(mWhat, mTarget);
 	msg->setInt32("hello",startNum);
 	msg->post(100);
 }
 
-void handler_1::onMessageReceived(AMessage * msg)
+void handler_1::onMessageReceived(const sp<AMessage> &msg)
 {
 	int32_t value;
 	int32_t what;
-	AMessage* msg_send;
-	bool ret;
 	what = msg->what();
 	if(what == 0)
 		{
 			if(msg->findInt32("hello",&value))
 				{
+					if(value == 100)return;
 					LOGI(LOG_TAG,"received the num %d message hello %d\n",what,value);
+					msg->setInt32("hello",value+1);
+					msg->setTarget(mTarget);
+					msg->post(10);
 				}
 		}
 }
