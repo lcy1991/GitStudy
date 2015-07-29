@@ -837,46 +837,28 @@ bool ARTSPConnection::receiveRTSPReponse() {
 
 
 bool ARTSPConnection::receiveRTSPRequest() {
-    AString statusLine;
+    AString requestLine;
 
-    if (!receiveLine(&statusLine)) {
+    if (!receiveLine(&requestLine)) {
         return false;
     }
 
-    if (statusLine == "$") {
-        sp<ABuffer> buffer = receiveBinaryData();
+    sp<ARTSPRequest> request = new ARTSPRequest;
+    request->mRequestLine = requestLine;
 
-        if (buffer == NULL) {
-            return false;
-        }
+    LOGI(LOG_TAG,"request: %s", request->mRequestLine.c_str());
 
-        if (mObserveBinaryMessage != NULL) {
-            sp<AMessage> notify = mObserveBinaryMessage->dup();
-            notify->setObject("buffer", buffer);
-            notify->post();
-        } else {
-            LOGW("received binary data, but no one cares.");
-        }
-
-        return true;
-    }
-
-    sp<ARTSPResponse> response = new ARTSPResponse;
-    response->mStatusLine = statusLine;
-
-    LOGI("status: %s", response->mStatusLine.c_str());
-
-    ssize_t space1 = response->mStatusLine.find(" ");
+    ssize_t space1 = request->mRequestLine.find(" ");//я╟ур©у╦Я
     if (space1 < 0) {
         return false;
     }
-    ssize_t space2 = response->mStatusLine.find(" ", space1 + 1);
+    ssize_t space2 = request->mRequestLine.find(" ", space1 + 1);
     if (space2 < 0) {
         return false;
     }
 
-    AString statusCodeStr(
-            response->mStatusLine, space1 + 1, space2 - space1 - 1);
+    AString method(
+            request->mRequestLine, space1);
 
     if (!ParseSingleUnsignedLong(
                 statusCodeStr.c_str(), &response->mStatusCode)

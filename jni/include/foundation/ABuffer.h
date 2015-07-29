@@ -22,12 +22,14 @@
 #include <stdint.h>
 #include <stdlib.h>
 #include "foundation/ABase.h"
+#include "foundation/LightRefBase.h"
+#include "foundation/StrongPointer.h"
 
 
 
 struct AMessage;
 
-struct ABuffer {
+struct ABuffer :public LightRefBase<ABuffer>{
     ABuffer(size_t capacity);
     ABuffer(void *data, size_t capacity);
 

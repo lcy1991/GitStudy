@@ -37,9 +37,11 @@ struct ARTSPResponse : public LightRefBase<ARTSPResponse> {            //ÏìÓ¦ÏûÏ
 };
 
 struct ARTSPRequest : public LightRefBase<ARTSPRequest> {              //ÇëÇóÏûÏ¢¸ñÊ½
-    unsigned long mStatusCode;                     //×´Ì¬Âë
-    AString mStatusLine;                            
-    map<AString,AString> mHeaders;                 //ÏûÏ¢Í· 
+//ÇëÇóĞĞ: ·½·¨£«¿Õ¸ñ£«URI(Uniform Resource Identifier)£«¿Õ¸ñ£«RTSP°æ±¾+»Ø³µ»»ĞĞ
+//e.g.  DESCRIBE rtsp://172.16.42.219/channel1/live RTSP/1.0\r\n
+    AString mRequestLine;                          //ÇëÇóĞĞ
+//ÏûÏ¢Í·:ÏûÏ¢ÄÚÈİ
+	map<AString,AString> mHeaders;                 //ÏûÏ¢Í· 
     sp<ABuffer> mContent;                          //ÏûÏ¢Ìå
 };
 
