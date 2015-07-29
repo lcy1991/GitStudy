@@ -93,10 +93,11 @@ void ARTSPConnection::observeBinaryData(const sp<AMessage> &reply) {
 
 void ARTSPConnection::onMessageReceived(const sp<AMessage> &msg) {
     switch (msg->what()) {
-        case kWhatListening:
+        case kWhatListening://kWhatStartService
             onListening(msg);
             break;
-
+		case kWhatStartService:
+			onStartService(msg);
         case kWhatDisconnect:
             onDisconnect(msg);
             break;
@@ -299,6 +300,18 @@ void ARTSPConnection::onListening(const sp<AMessage> &msg) {
 
     reply->post();
 }
+
+void ARTSPConnection::onStartService(const sp<AMessage> &msg)
+{
+    sp<AMessage> reply;
+    CHECK(msg->findMessage("reply", &reply));
+	//receive request
+    sp<AMessage> msg = new AMessage(kWhatReceiveRequest, id());
+	msg->setMessage("reply",reply);
+	msg->post();
+}
+
+
 void ARTSPConnection::CreateConnection(void* arg)
 {
 	ARTSPConnection* ptr = (ARTSPConnection*)arg;
@@ -535,7 +548,7 @@ void ARTSPConnection::onReceiveRequest() {  //Server receive clients' requests
 	 if (res == 1) {
 		 MakeSocketBlocking(mSocket, true);
 	
-		 bool success = receiveRTSPReponse();
+		 bool success = receiveRTSPRequest();
 	
 		 MakeSocketBlocking(mSocket, false);
 	
@@ -823,7 +836,7 @@ bool ARTSPConnection::receiveRTSPReponse() {
 }
 
 
-bool ARTSPConnection::receiveRTSPRequest(int socket) {
+bool ARTSPConnection::receiveRTSPRequest() {
     AString statusLine;
 
     if (!receiveLine(&statusLine)) {

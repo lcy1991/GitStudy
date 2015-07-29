@@ -24,6 +24,7 @@
 #include "foundation/StrongPointer.h"
 
 #include <map>
+#include <pthread.h>
 namespace android {
 
 struct ABuffer;
@@ -34,6 +35,14 @@ struct ARTSPResponse : public LightRefBase<ARTSPResponse> {            //ÏìÓ¦ÏûÏ
     map<AString,AString> mHeaders;                 //ÏûÏ¢Í· 
     sp<ABuffer> mContent;                          //ÏûÏ¢Ìå
 };
+
+struct ARTSPRequest : public LightRefBase<ARTSPRequest> {              //ÇëÇóÏûÏ¢¸ñÊ½
+    unsigned long mStatusCode;                     //×´Ì¬Âë
+    AString mStatusLine;                            
+    map<AString,AString> mHeaders;                 //ÏûÏ¢Í· 
+    sp<ABuffer> mContent;                          //ÏûÏ¢Ìå
+};
+
 
 struct ARTSPConnection : public AHandler {
     ARTSPConnection();
@@ -61,7 +70,9 @@ private:
         kWhatDisconnect         = 'disc',
         kWhatCompleteConnection = 'comc',
         kWhatSendRequest        = 'sreq',
+        kWhatSendResponse       = 'sres',
         kWhatReceiveResponse    = 'rres',
+        kWhatReceiveRequest     = 'rreq',
         kWhatObserveBinaryData  = 'obin',
     };
 
@@ -74,13 +85,17 @@ private:
     static const int64_t kSelectTimeoutUs;
 
     State mState;
+	uint32_t mConnectedNum;
+	map<pthread_t, int> mConnectSocket;//<pthread_t_ID,socketfd>
     AString mUser, mPass;
     AuthType mAuthType;
     AString mNonce;
     int mSocket;
 	int mSocket_listen;
 	int mSocket_client;
+	int mSocketAccept;
     int32_t mConnectionID;
+    pthread_t mTID;
     int32_t mNextCSeq;
     bool mReceiveResponseEventPending;
 
