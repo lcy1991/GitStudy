@@ -1,3 +1,6 @@
+#ifndef LIGHTREFBASE_H
+#define LIGHTREFBASE_H
+
 #include <stdint.h>
 #ifdef ANDROID_NDK
 #include <sys/atomics.h>
@@ -34,3 +37,4 @@ protected:
 private:
     mutable volatile int32_t mCount;
 };
+#endif

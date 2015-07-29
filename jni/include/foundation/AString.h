@@ -19,9 +19,10 @@
 #define A_STRING_H_
 
 #include <sys/types.h>
+#include "foundation/LightRefBase.h"
+#include "foundation/StrongPointer.h"
 
-
-struct AString {
+struct AString :public LightRefBase<AString>{
     AString();
     AString(const char *s);
     AString(const char *s, size_t size);
