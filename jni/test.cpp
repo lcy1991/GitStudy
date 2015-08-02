@@ -13,7 +13,8 @@ int main()
 	ALooper* looper1 =  new ALooper;
 	ALooper* looper2 =  new ALooper;
 	AString* astring = new AString(tmp,3);
-	LOGI("log_tag","status: %s\n", astring->c_str());
+	ssize_t space1 = astring->find("3");
+	LOGI("log_tag","status: %s %d\n", astring->c_str(),space1);
 	looper1->registerHandler(handler1);
 	looper2->registerHandler(handler2);
 	handler1->setTarget(handler2->id());

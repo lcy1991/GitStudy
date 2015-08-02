@@ -70,6 +70,7 @@ private:
     enum {
         kWhatListening          = 'list',
         kWhatDisconnect         = 'disc',
+        kWhatStartListen        = 'star',
         kWhatCompleteConnection = 'comc',
         kWhatSendRequest        = 'sreq',
         kWhatSendResponse       = 'sres',
@@ -104,6 +105,7 @@ private:
     map<int32_t, sp<AMessage> > mPendingRequests;
 
     sp<AMessage> mObserveBinaryMessage;
+	sp<AMessage> mRequestReturn;
 
     void onListening(const sp<AMessage> &msg);
     void onDisconnect(const sp<AMessage> &msg);

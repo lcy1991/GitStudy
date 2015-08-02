@@ -96,8 +96,10 @@ void ARTSPConnection::onMessageReceived(const sp<AMessage> &msg) {
         case kWhatListening://kWhatStartService
             onListening(msg);
             break;
-		case kWhatStartService:
-			onStartService(msg);
+			
+		case kWhatStartListen:
+			onStartListen(msg);
+			
         case kWhatDisconnect:
             onDisconnect(msg);
             break;
@@ -105,13 +107,9 @@ void ARTSPConnection::onMessageReceived(const sp<AMessage> &msg) {
         case kWhatCompleteConnection:
             onCompleteConnection(msg);
             break;
-
-        case kWhatSendRequest:
-            onSendRequest(msg);
-            break;
-
-        case kWhatReceiveResponse:
-            onReceiveResponse();
+			
+        case kWhatReceiveRequest:
+            onReceiveResponse(msg);
             break;
 
         case kWhatObserveBinaryData:
@@ -301,14 +299,14 @@ void ARTSPConnection::onListening(const sp<AMessage> &msg) {
     reply->post();
 }
 
-void ARTSPConnection::onStartService(const sp<AMessage> &msg)
+void ARTSPConnection::onStartListen(const sp<AMessage> &msg)
 {
-    sp<AMessage> reply;
-    CHECK(msg->findMessage("reply", &reply));
+    sp<AMessage> req;
+    CHECK(msg->findMessage("req", &mRequestReturn));
 	//receive request
-    sp<AMessage> msg = new AMessage(kWhatReceiveRequest, id());
-	msg->setMessage("reply",reply);
-	msg->post();
+    sp<AMessage> reply = new AMessage(kWhatReceiveRequest, id());
+	reply->setMessage("req",req);
+	reply->post();
 }
 
 
@@ -474,17 +472,11 @@ void ARTSPConnection::onSendResponse(const sp<AMessage> &msg) {
         return;
     }
 
-    AString request;
-    CHECK(msg->findString("request", &request));
-
-    // Just in case we need to re-issue the request with proper authentication
-    // later, stash it away.
-    reply->setString("original-request", request.c_str(), request.size());
-
-    addAuthentication(&request);
+    AString response;
+    CHECK(msg->findString("response", &response));
 
     // Find the boundary between headers and the body.
-    ssize_t i = request.find("\r\n\r\n");
+    ssize_t i = response.find("\r\n\r\n");
     CHECK_GE(i, 0);
 
     int32_t cseq = mNextCSeq++;
@@ -493,19 +485,19 @@ void ARTSPConnection::onSendResponse(const sp<AMessage> &msg) {
     cseqHeader.append(cseq);
     cseqHeader.append("\r\n");
 
-    request.insert(cseqHeader, i + 2);
+    response.insert(cseqHeader, i + 2);
 
-    LOGV("request: '%s'", request.c_str());
+    LOGV("response: '%s'", response.c_str());
 
     size_t numBytesSent = 0;
-    while (numBytesSent < request.size()) {
+    while (numBytesSent < response.size()) {
         ssize_t n =
-            send(mSocket, request.c_str() + numBytesSent,
-                 request.size() - numBytesSent, 0);
+            send(mSocket, response.c_str() + numBytesSent,
+                 response.size() - numBytesSent, 0);
 
         if (n == 0) {
             // Server closed the connection.
-            LOGE("Server unexpectedly closed the connection.");
+            LOGE("Client unexpectedly closed the connection.");
 
             reply->setInt32("result", ERROR_IO);
             reply->post();
@@ -515,7 +507,7 @@ void ARTSPConnection::onSendResponse(const sp<AMessage> &msg) {
                 continue;
             }
 
-            LOGE("Error sending rtsp request.");
+            LOGE("Error sending rtsp response.");
             reply->setInt32("result", -errno);
             reply->post();
             return;
@@ -523,11 +515,11 @@ void ARTSPConnection::onSendResponse(const sp<AMessage> &msg) {
 
         numBytesSent += (size_t)n;
     }
-
-    mPendingRequests.add(cseq, reply);
+	reply->post();//上一层收到发送结果成功或失败
+//    mPendingRequests.add(cseq, reply);//等待服务器回应，返回发送结果服务器应不做回应，只发送相应
 }
 
-void ARTSPConnection::onReceiveRequest() {  //Server receive clients' requests
+void ARTSPConnection::onReceiveRequest(const sp<AMessage> &msg) {  //Server receives clients' requests
 	mReceiveResponseEventPending = false;
 	
 	 if (mState != CONNECTED) {
@@ -563,41 +555,6 @@ void ARTSPConnection::onReceiveRequest() {  //Server receive clients' requests
 
 }
 
-void ARTSPConnection::onReceiveResponse() {
-    mReceiveResponseEventPending = false;
-
-    if (mState != CONNECTED) {
-        return;
-    }
-
-    struct timeval tv;
-    tv.tv_sec = 0;
-    tv.tv_usec = kSelectTimeoutUs;
-
-    fd_set rs;
-    FD_ZERO(&rs);
-    FD_SET(mSocket, &rs);
-
-    int res = select(mSocket + 1, &rs, NULL, NULL, &tv);
-    CHECK_GE(res, 0);
-
-    if (res == 1) {
-        MakeSocketBlocking(mSocket, true);
-
-        bool success = receiveRTSPReponse();
-
-        MakeSocketBlocking(mSocket, false);
-
-        if (!success) {
-            // Something horrible, irreparable has happened.
-            flushPendingRequests();
-            return;
-        }
-    }
-
-    postReceiveReponseEvent();
-}
-
 void ARTSPConnection::flushPendingRequests() {
     for (size_t i = 0; i < mPendingRequests.size(); ++i) {
         sp<AMessage> reply = mPendingRequests.valueAt(i);
@@ -609,16 +566,6 @@ void ARTSPConnection::flushPendingRequests() {
     mPendingRequests.clear();
 }
 
-void ARTSPConnection::postReceiveReponseEvent() {
-    if (mReceiveResponseEventPending) {
-        return;
-    }
-
-    sp<AMessage> msg = new AMessage(kWhatReceiveResponse, id());
-    msg->post();
-
-    mReceiveResponseEventPending = true;
-}
 
 //liuchangyou
 void ARTSPConnection::postReceiveRequestEvent() {
@@ -697,145 +644,6 @@ sp<ABuffer> ARTSPConnection::receiveBinaryData() {
     return buffer;
 }
 
-bool ARTSPConnection::receiveRTSPReponse() {
-    AString statusLine;
-
-    if (!receiveLine(&statusLine)) {
-        return false;
-    }
-
-    if (statusLine == "$") {
-        sp<ABuffer> buffer = receiveBinaryData();
-
-        if (buffer == NULL) {
-            return false;
-        }
-
-        if (mObserveBinaryMessage != NULL) {
-            sp<AMessage> notify = mObserveBinaryMessage->dup();
-            notify->setObject("buffer", buffer);
-            notify->post();
-        } else {
-            LOGW("received binary data, but no one cares.");
-        }
-
-        return true;
-    }
-
-    sp<ARTSPResponse> response = new ARTSPResponse;
-    response->mStatusLine = statusLine;
-
-    LOGI("status: %s", response->mStatusLine.c_str());
-
-    ssize_t space1 = response->mStatusLine.find(" ");
-    if (space1 < 0) {
-        return false;
-    }
-    ssize_t space2 = response->mStatusLine.find(" ", space1 + 1);
-    if (space2 < 0) {
-        return false;
-    }
-
-    AString statusCodeStr(
-            response->mStatusLine, space1 + 1, space2 - space1 - 1);
-
-    if (!ParseSingleUnsignedLong(
-                statusCodeStr.c_str(), &response->mStatusCode)
-            || response->mStatusCode < 100 || response->mStatusCode > 999) {
-        return false;
-    }
-
-    AString line;
-    for (;;) {
-        if (!receiveLine(&line)) {
-            break;
-        }
-
-        if (line.empty()) {
-            break;
-        }
-
-        LOGV("line: %s", line.c_str());
-
-        ssize_t colonPos = line.find(":");
-        if (colonPos < 0) {
-            // Malformed header line.
-            return false;
-        }
-
-        AString key(line, 0, colonPos);
-        key.trim();
-        key.tolower();
-
-        line.erase(0, colonPos + 1);
-        line.trim();
-
-        response->mHeaders.add(key, line);
-    }
-
-    unsigned long contentLength = 0;
-
-    ssize_t i = response->mHeaders.indexOfKey("content-length");
-
-    if (i >= 0) {
-        AString value = response->mHeaders.valueAt(i);
-        if (!ParseSingleUnsignedLong(value.c_str(), &contentLength)) {
-            return false;
-        }
-    }
-
-    if (contentLength > 0) {
-        response->mContent = new ABuffer(contentLength);
-
-        size_t numBytesRead = 0;
-        while (numBytesRead < contentLength) {
-            ssize_t n = recv(
-                    mSocket, response->mContent->data() + numBytesRead,
-                    contentLength - numBytesRead, 0);
-
-            if (n == 0) {
-                // Server closed the connection.
-                TRESPASS();
-            } else if (n < 0) {
-                if (errno == EINTR) {
-                    continue;
-                }
-
-                TRESPASS();
-            }
-
-            numBytesRead += (size_t)n;
-        }
-    }
-
-    if (response->mStatusCode == 401) {
-        if (mAuthType == NONE && mUser.size() > 0
-                && parseAuthMethod(response)) {
-            ssize_t i;
-            CHECK_EQ((status_t)OK, findPendingRequest(response, &i));
-            CHECK_GE(i, 0);
-
-            sp<AMessage> reply = mPendingRequests.valueAt(i);
-            mPendingRequests.removeItemsAt(i);
-
-            AString request;
-            CHECK(reply->findString("original-request", &request));
-
-            sp<AMessage> msg = new AMessage(kWhatSendRequest, id());
-            msg->setMessage("reply", reply);
-            msg->setString("request", request.c_str(), request.size());
-
-            LOGI("re-sending request with authentication headers...");
-            onSendRequest(msg);
-
-            return true;
-        }
-    }
-
-    return notifyResponseListener(response);
-}
-
-
 bool ARTSPConnection::receiveRTSPRequest() {
     AString requestLine;
 
@@ -857,15 +665,8 @@ bool ARTSPConnection::receiveRTSPRequest() {
         return false;
     }
 
-    AString method(
-            request->mRequestLine, space1);
-
-    if (!ParseSingleUnsignedLong(
-                statusCodeStr.c_str(), &response->mStatusCode)
-            || response->mStatusCode < 100 || response->mStatusCode > 999) {
-        return false;
-    }
-
+    AString Method(request->mRequestLine, space1);
+	mRequestReturn->setString("Method",Method);
     AString line;
     for (;;) {
         if (!receiveLine(&line)) {
@@ -890,70 +691,11 @@ bool ARTSPConnection::receiveRTSPRequest() {
 
         line.erase(0, colonPos + 1);
         line.trim();
-
-        response->mHeaders.add(key, line);
+        request->mHeaders.insert(make_pair(key, line));
     }
 
-    unsigned long contentLength = 0;
-
-    ssize_t i = response->mHeaders.indexOfKey("content-length");
-
-    if (i >= 0) {
-        AString value = response->mHeaders.valueAt(i);
-        if (!ParseSingleUnsignedLong(value.c_str(), &contentLength)) {
-            return false;
-        }
-    }
-
-    if (contentLength > 0) {
-        response->mContent = new ABuffer(contentLength);
-
-        size_t numBytesRead = 0;
-        while (numBytesRead < contentLength) {
-            ssize_t n = recv(
-                    mSocket, response->mContent->data() + numBytesRead,
-                    contentLength - numBytesRead, 0);
-
-            if (n == 0) {
-                // Server closed the connection.
-                TRESPASS();
-            } else if (n < 0) {
-                if (errno == EINTR) {
-                    continue;
-                }
-
-                TRESPASS();
-            }
-
-            numBytesRead += (size_t)n;
-        }
-    }
-
-    if (response->mStatusCode == 401) {
-        if (mAuthType == NONE && mUser.size() > 0
-                && parseAuthMethod(response)) {
-            ssize_t i;
-            CHECK_EQ((status_t)OK, findPendingRequest(response, &i));
-            CHECK_GE(i, 0);
-
-            sp<AMessage> reply = mPendingRequests.valueAt(i);
-            mPendingRequests.removeItemsAt(i);
-
-            AString request;
-            CHECK(reply->findString("original-request", &request));
-
-            sp<AMessage> msg = new AMessage(kWhatSendRequest, id());
-            msg->setMessage("reply", reply);
-            msg->setString("request", request.c_str(), request.size());
-
-            LOGI("re-sending request with authentication headers...");
-            onSendRequest(msg);
-
-            return true;
-        }
-    }
-
-    return notifyResponseListener(response);
+//    return notifyResponseListener(request);
+	return notifyRequestListener(request);//通知并 返回请求给listener
 }
 
 
@@ -970,7 +712,7 @@ bool ARTSPConnection::ParseSingleUnsignedLong(
     return true;
 }
 
-status_t ARTSPConnection::findPendingRequest(
+status_t ARTSPConnection::findPendingRequest(//找到cseq 对应请求的相应,返回给上层
         const sp<ARTSPResponse> &response, ssize_t *index) const {
     *index = 0;
 
@@ -1022,6 +764,32 @@ bool ARTSPConnection::notifyResponseListener(
 
     return true;
 }
+
+
+bool ARTSPConnection::notifyRequestListener(
+        const sp<ARTSPRequest> &request) {
+    ssize_t i;
+    status_t err = findPendingRequest(request, &i);
+
+    if (err == OK && i < 0) {
+        // An unsolicited server response is not a problem.
+        return true;
+    }
+
+    if (err != OK) {
+        return false;
+    }
+
+    sp<AMessage> reply = mPendingRequests.valueAt(i);
+    mPendingRequests.removeItemsAt(i);
+
+    reply->setInt32("result", OK);
+    reply->setObject("response", response);
+    reply->post();
+
+    return true;
+}
+
 
 bool ARTSPConnection::parseAuthMethod(const sp<ARTSPResponse> &response) {
     ssize_t i = response->mHeaders.indexOfKey("www-authenticate");
