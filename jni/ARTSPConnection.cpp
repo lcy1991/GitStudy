@@ -178,7 +178,7 @@ static void MakeSocketBlocking(int s, bool blocking) {
     CHECK_NE(fcntl(s, F_SETFL, flags), -1);
 }
 
-void ARTSPConnection::onStartListen(int socket,handler_id handlerID)
+void ARTSPConnection::StartListen(int socket,handler_id handlerID)
 {
 	mSocket = socket;
 	mhandlerID = handlerID;

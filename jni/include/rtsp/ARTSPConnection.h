@@ -108,7 +108,7 @@ private:
 
     sp<AMessage> mObserveBinaryMessage;
 	sp<AMessage> mRequestReturn;
-	void onStartListen(int socket,handler_id handlerID);
+	void StartListen(int socket,handler_id handlerID);
     void onDisconnect(const sp<AMessage> &msg);
     void onCompleteConnection(const sp<AMessage> &msg);
     void onSendResponse(const sp<AMessage> &msg);
