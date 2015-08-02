@@ -8,7 +8,10 @@ OBJ=                   \
 	AMessage.o         \
 	AString.o          \
 	ABuffer.o          \
-	handler_1.o
+	handler_1.o        \
+	base64.o           \
+	ARTSPConnection.o
+
 CC=g++
 CFLAGS=-Wno-multichar
 

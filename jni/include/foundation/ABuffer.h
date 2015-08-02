@@ -48,7 +48,7 @@ struct ABuffer :public LightRefBase<ABuffer>{
 
     AMessage* meta();
 
-protected:
+//protected:
     virtual ~ABuffer();
 
 private:
