@@ -178,10 +178,11 @@ static void MakeSocketBlocking(int s, bool blocking) {
     CHECK_NE(fcntl(s, F_SETFL, flags), -1);
 }
 
-void ARTSPConnection::StartListen(int socket,handler_id handlerID)
+void ARTSPConnection::StartListen(int socket,handler_id handlerID,uint32_t mtempSessionID)
 {
 	mSocket = socket;
 	mhandlerID = handlerID;
+	mSessionID = mtempSessionID;
     sp<AMessage> reply = new AMessage(kWhatReceiveRequest, id());
 	reply->post();
 }

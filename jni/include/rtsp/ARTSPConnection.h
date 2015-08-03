@@ -98,9 +98,9 @@ private:
 	int mSocket_listen;
 	int mSocket_client;
 	int mSocketAccept;
-    int32_t mConnectionID;
+	pthread_t mTID;
+    uint32_t mSessionID;
 	handler_id mhandlerID;// request msg target
-    pthread_t mTID;
     int32_t mNextCSeq;
 	bool mReceiveRequestEventPending;
 

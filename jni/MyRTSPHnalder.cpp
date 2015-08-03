@@ -12,7 +12,10 @@ MyRTSPHandler::~MyRTSPHandler()
 
 void MyRTSPHandler::onMessageReceived(const sp<AMessage> &msg)
 {
-
+	switch(msg->kwhat())
+		{
+			case:
+		}
 }
 
 void MyRTSPHandler::StartServer()
@@ -43,6 +46,8 @@ void MyRTSPHandler::StartServer()
 	while(mRunningFlag)
 		{
 		   //mSocketAccept需要锁保护
+		    pthread_mutex_lock(&mMutex);
+		    mtempSessionID++;
 			mSocketAccept = accept(mSocket,NULL,NULL);
 			pthread_create(&mTID,NULL,NewSession,(void*)this);		
 			LOGE(LOG_TAG,"mConnectedNum[%d]",mConnectionID);			
@@ -65,10 +70,13 @@ static void MyRTSPHandler::NewSession(void* arg)
 	MyRTSPHandler* handlerPt = (MyRTSPHandler*)arg;
 	ARTSPConnection* rtspConn = new ARTSPConnection();
 	handlerPt->mlooper.registerHandler(rtspConn);
-	rtspConn->StartListen(handlerPt->mSocketAccept,handlerPt->id());
+	rtspConn->StartListen(handlerPt->mSocketAccept,handlerPt->id(),mtempSessionID);
+	pthread_mutex_unlock(&mMutex);
 	while(rtspConn->)
 		{
 			sleep(1);
 		}
+	delete(rtspConn);
+	LOGI(LOG_TAG,"session closeed\n");
 }
 
