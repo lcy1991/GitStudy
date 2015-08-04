@@ -36,10 +36,9 @@
 const int64_t ARTSPConnection::kSelectTimeoutUs = 1000ll;
 
 ARTSPConnection::ARTSPConnection()
-    : mState(DISCONNECTED),
+    : mState(CONNECTED),
       mAuthType(NONE),
       mSocket(-1),
-      mConnectionID(0),
       mNextCSeq(0),
       mReceiveRequestEventPending(false) {
 }
@@ -216,7 +215,7 @@ void ARTSPConnection::onCompleteConnection(const sp<AMessage> &msg) {
     int32_t connectionID;
     CHECK(msg->findInt32("connection-id", &connectionID));
 
-    if ((connectionID != mConnectionID) || mState != CONNECTING) {
+    if (mState != CONNECTING) {
         // While we were attempting to connect, the attempt was
         // cancelled.
         reply->setInt32("result", -ECONNABORTED);
@@ -375,6 +374,7 @@ status_t ARTSPConnection::receive(void *data, size_t size) {
     size_t offset = 0;
     while (offset < size) {
         ssize_t n = recv(mSocket, (uint8_t *)data + offset, size - offset, 0);
+//		LOGE(LOG_TAG,"recv %d byte %c\n",n,*(uint8_t *)data);//lcy sdebug
         if (n == 0) {
             // Server closed the connection.
             LOGE(LOG_TAG,"Server unexpectedly closed the connection.");
@@ -406,6 +406,7 @@ bool ARTSPConnection::receiveLine(AString *line) {
 
         if (sawCR && c == '\n') {
             line->erase(line->size() - 1, 1);
+			//LOGI(LOG_TAG,"receive line OK \n%s\n",line->c_str());
             return true;
         }
 
@@ -422,13 +423,14 @@ bool ARTSPConnection::receiveLine(AString *line) {
 
 bool ARTSPConnection::receiveRTSPRequest() {
     AString requestLine;
-
+	LOGI(LOG_TAG,"start receiveLine ......\n");
     if (!receiveLine(&requestLine)) {
         return false;
     }
+//	LOGI(LOG_TAG,"receiveLine OK\n");
     sp<AMessage>  request = new AMessage(kWhatRequest,mhandlerID);
 
-    LOGI(LOG_TAG,"request: %s", requestLine.c_str());
+    LOGI(LOG_TAG,"request: %s\n", requestLine.c_str());
 
     ssize_t space1 = requestLine.find(" ");//寻找空格
     if (space1 < 0) {
@@ -451,7 +453,7 @@ bool ARTSPConnection::receiveRTSPRequest() {
             break;
         }
 
-        LOGI(LOG_TAG,"line: %s", line.c_str());
+        LOGI(LOG_TAG,"line: %s\n", line.c_str());
 
         ssize_t colonPos = line.find(":");
         if (colonPos < 0) {
@@ -468,6 +470,7 @@ bool ARTSPConnection::receiveRTSPRequest() {
 
 	    request->setString(key.c_str(),line.c_str());	
     }
+	LOGI(LOG_TAG,"Post the request to handler\n");
     request->post();//将请求消息发送给uplayer 处理
 	return OK;
 }

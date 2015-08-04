@@ -10,7 +10,9 @@ OBJ=                   \
 	ABuffer.o          \
 	handler_1.o        \
 	base64.o           \
-	ARTSPConnection.o
+	ARTSPConnection.o  \
+	MyRTSPHandler.o
+
 
 CC=g++
 CFLAGS=-Wno-multichar

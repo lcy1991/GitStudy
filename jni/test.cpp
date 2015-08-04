@@ -3,6 +3,7 @@
 #include "foundation/ALooper.h"
 #include <unistd.h>
 #include "foundation/ADebug.h"
+#include "rtsp/MyRTSPHandler.h"
 
 int main()
 {
@@ -33,6 +34,13 @@ int main()
 	delete handler2;
 	delete looper1;
 	delete looper2;
+
+	MyRTSPHandler handler_rtsp;
+	handler_rtsp.StartServer();
+	
+
+
+	
 	return 0;
 }
 

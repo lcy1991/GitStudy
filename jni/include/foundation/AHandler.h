@@ -37,14 +37,13 @@ struct AHandler{
     }
 
     ALooper* looper();
+    handler_id mID;
 
 protected:
     virtual void onMessageReceived(const sp<AMessage> &msg) = 0;
 
 private:
     friend struct ALooperRoster;
-
-    handler_id mID;
 
     void setID(handler_id id) {
         mID = id;

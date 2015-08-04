@@ -28,6 +28,26 @@
 
 struct ABuffer;
 
+enum State {
+	DISCONNECTED,
+	CONNECTING,
+	CONNECTED,
+};
+
+enum {
+	kWhatListening			= 'list',
+	kWhatDisconnect 		= 'disc',
+	kWhatStartListen		= 'star',
+	kWhatCompleteConnection = 'comc',
+	kWhatSendResponse		= 'sres',
+	kWhatReceiveResponse	= 'rres',
+	kWhatReceiveRequest 	= 'rreq',
+	kWhatObserveBinaryData	= 'obin',
+	kWhatRequest			= 'requ',
+};
+
+
+
 struct ARTSPResponse : public LightRefBase<ARTSPResponse> {            //响应消息格式
     unsigned long mStatusCode;                     //状态码
     AString mStatusLine;                            
@@ -56,30 +76,18 @@ struct ARTSPConnection : public AHandler {
     void observeBinaryData(const sp<AMessage> &reply);
 	
 	void postReceiveRequestEvent();
+	void StartListen(int socket,handler_id handlerID,uint32_t mtempSessionID);	
+    State mState;
+    uint32_t mSessionID;
+//	int mSocketAccept;
+    int mSocket;	
+	pthread_t mTID;
 
 protected:
     virtual ~ARTSPConnection();
     virtual void onMessageReceived(const sp<AMessage> &msg);
 
 private:
-    enum State {
-        DISCONNECTED,
-        CONNECTING,
-        CONNECTED,
-    };
-
-    enum {
-        kWhatListening          = 'list',
-        kWhatDisconnect         = 'disc',
-        kWhatStartListen        = 'star',
-        kWhatCompleteConnection = 'comc',
-        kWhatSendResponse       = 'sres',
-        kWhatReceiveResponse    = 'rres',
-        kWhatReceiveRequest     = 'rreq',
-        kWhatObserveBinaryData  = 'obin',
-        kWhatRequest            = 'requ',
-    };
-
     enum AuthType {
         NONE,
         BASIC,
@@ -88,18 +96,17 @@ private:
 
     static const int64_t kSelectTimeoutUs;
 
-    State mState;
+
 	uint32_t mConnectedNum;
 	map<pthread_t, int> mConnectSocket;//<pthread_t_ID,socketfd>
     AString mUser, mPass;
     AuthType mAuthType;
     AString mNonce;
-    int mSocket;
+
 	int mSocket_listen;
 	int mSocket_client;
-	int mSocketAccept;
-	pthread_t mTID;
-    uint32_t mSessionID;
+
+
 	handler_id mhandlerID;// request msg target
     int32_t mNextCSeq;
 	bool mReceiveRequestEventPending;
@@ -108,7 +115,6 @@ private:
 
     sp<AMessage> mObserveBinaryMessage;
 	sp<AMessage> mRequestReturn;
-	void StartListen(int socket,handler_id handlerID);
     void onDisconnect(const sp<AMessage> &msg);
     void onCompleteConnection(const sp<AMessage> &msg);
     void onSendResponse(const sp<AMessage> &msg);

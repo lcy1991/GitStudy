@@ -12,10 +12,11 @@
 #include<map>
 #include "foundation/AHandler.h"
 #include "foundation/AMessage.h"
+#include "foundation/ADebug.h"
+
+#include "ARTSPConnection.h"
 struct SessionInfo
 {
-
-	int socket;
 	ARTSPConnection* RTSPConnPt;	
 };
 
@@ -28,15 +29,19 @@ struct MyRTSPHandler : public AHandler
 	bool mRunningFlag;
 	map<uint32_t,ARTSPConnection*> mSessions;//<session_id,ARTSPConnection pointer>
 protected:
-	static void NewSession(void* arg);
+static void* NewSession(void* arg);
     virtual void onMessageReceived(const sp<AMessage> &msg);
 	int mSocket;
 	int mSocketAccept;
-	uint32_t session_id=0;
+    uint32_t session_id;
 	ALooper mlooper;
-	pthread_mutex_t mMutex = PTHREAD_MUTEX_INITIALIZER;
+	pthread_mutex_t mMutex;
 	pthread_t mtempTID;
-	uint32_t mtempSessionID = 0;
+	uint32_t mtempSessionID;
+private:
+	    enum {
+        kwhatCloseSession   = 'clse',
+    };
 
 	
 };
