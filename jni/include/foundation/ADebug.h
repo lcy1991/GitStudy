@@ -25,9 +25,9 @@
 #include <android/log.h>
 #else
 #include <stdio.h>
+#include <string.h>
+#include <stdarg.h>
 #endif
-
-
 
 #define LITERAL_TO_STRING_INTERNAL(x)    #x
 #define LITERAL_TO_STRING(x) LITERAL_TO_STRING_INTERNAL(x)
@@ -40,6 +40,22 @@
 #define LOGW(tag, format, args...) __android_log_print(ANDROID_LOG_WARN,tag,format,##args)
 #define LOGI(tag, format, args...) __android_log_print(ANDROID_LOG_INFO,tag,format,##args)
 #else
+	FILE *logfp = NULL;
+void PrintLog(const char *format, ...)
+{
+	if(fp == NULL)
+	{
+		logfp = fopen("log.txt", "w");
+	}
+	va_list ap;
+	va_start(ap, format);
+	if(fp) vfprintf(fp,format,ap);//输出到文件
+	va_start(ap, format);
+	vprintf(format,ap);//输出到终端
+
+	va_end(ap);
+	fflush(fp);
+}	
 #define LOGF(tag, format, args...) printf(format,##args)
 #define LOGE(tag, format, args...) printf(format,##args)
 #define LOGW(tag, format, args...) printf(format,##args)
