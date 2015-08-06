@@ -10,6 +10,7 @@ OBJ=                   \
 	ABuffer.o          \
 	handler_1.o        \
 	base64.o           \
+	AAtomizer.o        \
 	ARTSPConnection.o  \
 	MyRTSPHandler.o
 

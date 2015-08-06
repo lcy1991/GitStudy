@@ -20,9 +20,9 @@ int main()
 	looper2->registerHandler(handler2);
 	handler1->setTarget(handler2->id());
 	handler2->setTarget(handler1->id());
-	handler1->start(0,0);
 	looper1->start();
 	looper2->start();
+	handler1->start(0,0);
 /*	for(i=0;i<100;i++)
 		{
 			handler1->start(0,2*i);

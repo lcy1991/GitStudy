@@ -18,7 +18,7 @@
 
 #include <ctype.h>
 
-//#include "AAtomizer.h"
+#include "foundation/AAtomizer.h"
 #include "foundation/ADebug.h"
 #include "foundation/ALooperRoster.h"
 #include "foundation/AString.h"
@@ -82,7 +82,7 @@ void AMessage::freeItem(Item *item) {
 }
 
 AMessage::Item *AMessage::allocateItem(const char *name) {
-//    name = AAtomizer::Atomize(name);
+    name = AAtomizer::Atomize(name);
 
     size_t i = 0;
     while (i < mNumItems && mItems[i].mName != name) {
@@ -107,7 +107,7 @@ AMessage::Item *AMessage::allocateItem(const char *name) {
 
 const AMessage::Item *AMessage::findItem(
         const char *name, Type type) const {
-//    name = AAtomizer::Atomize(name);
+    name = AAtomizer::Atomize(name);
 
     for (size_t i = 0; i < mNumItems; ++i) {
         const Item *item = &mItems[i];

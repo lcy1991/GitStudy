@@ -23,7 +23,7 @@ void handler_1::start(uint32_t mWhat,uint32_t startNum)
 	
 	sp<AMessage> msg = new AMessage(mWhat, mTarget);
 	msg->setInt32("hello",startNum);
-	msg->post(100);
+	msg->post();
 }
 
 void handler_1::onMessageReceived(const sp<AMessage> &msg)

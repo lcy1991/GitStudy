@@ -40,22 +40,24 @@
 #define LOGW(tag, format, args...) __android_log_print(ANDROID_LOG_WARN,tag,format,##args)
 #define LOGI(tag, format, args...) __android_log_print(ANDROID_LOG_INFO,tag,format,##args)
 #else
-	FILE *logfp = NULL;
+/*
 void PrintLog(const char *format, ...)
 {
-	if(fp == NULL)
+	FILE *logfp = NULL;
+
+	if(logfp == NULL)
 	{
 		logfp = fopen("log.txt", "w");
 	}
 	va_list ap;
 	va_start(ap, format);
-	if(fp) vfprintf(fp,format,ap);//输出到文件
+	if(logfp) vfprintf(logfp,format,ap);
 	va_start(ap, format);
-	vprintf(format,ap);//输出到终端
+	vprintf(format,ap);
 
 	va_end(ap);
-	fflush(fp);
-}	
+	fflush(logfp);
+}	*/
 #define LOGF(tag, format, args...) printf(format,##args)
 #define LOGE(tag, format, args...) printf(format,##args)
 #define LOGW(tag, format, args...) printf(format,##args)

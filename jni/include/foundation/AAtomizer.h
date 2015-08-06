@@ -14,45 +14,42 @@
  * limitations under the License.
  */
 
-#ifndef A_HANDLER_H_
+#ifndef A_ATOMIZER_H_
 
-#define A_HANDLER_H_
+#define A_ATOMIZER_H_
 
-#include "foundation/ALooper.h"
-#include "foundation/StrongPointer.h"
+
 #include <stdint.h>
 
-typedef int32_t handler_id;
+#include "foundation/ABase.h"
+#include "foundation/AString.h"
+#include<list>
+//#include <utils/Vector.h>
+#include<vector>
 
-struct AMessage;
-struct ALooper;
-
-struct AHandler{
-    AHandler()
-        : mID(0) {
-    }
-
-        handler_id id() const {
-        return mID;
-    }
-
-    ALooper* looper();
+#include "foundation/Mutex.h"
+using namespace std;
 
 
-protected:
 
-    virtual void onMessageReceived(const sp<AMessage> &msg) = 0;
+struct AAtomizer {
+    static const char *Atomize(const char *name);
 
 private:
-    friend struct ALooperRoster;
-	handler_id mID;
+    static AAtomizer gAtomizer;
 
-    void setID(handler_id id) {
-        mID = id;
-    }
+    Mutex mLock;
+    std::vector< list<AString> > mAtoms;
 
-    DISALLOW_EVIL_CONSTRUCTORS(AHandler);
+    AAtomizer();
+
+    const char *atomize(const char *name);
+
+    static uint32_t Hash(const char *s);
+
+    DISALLOW_EVIL_CONSTRUCTORS(AAtomizer);
 };
 
 
-#endif  // A_HANDLER_H_
+
+#endif  // A_ATOMIZER_H_

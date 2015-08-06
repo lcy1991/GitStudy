@@ -182,6 +182,7 @@ void ARTSPConnection::StartListen(int socket,handler_id handlerID,uint32_t mtemp
 	mSocket = socket;
 	mhandlerID = handlerID;
 	mSessionID = mtempSessionID;
+	LOGI(LOG_TAG,"StartListen mSessionID[%u]\n",mSessionID);
     sp<AMessage> reply = new AMessage(kWhatReceiveRequest, id());
 	reply->post();
 }
@@ -429,7 +430,8 @@ bool ARTSPConnection::receiveRTSPRequest() {
     }
 //	LOGI(LOG_TAG,"receiveLine OK\n");
     sp<AMessage>  request = new AMessage(kWhatRequest,mhandlerID);
-
+	request->setInt32("SessionID",mSessionID);
+	LOGI(LOG_TAG,"request->setInt32 SessionID %d\n",mSessionID);
     LOGI(LOG_TAG,"request: %s\n", requestLine.c_str());
 
     ssize_t space1 = requestLine.find(" ");//я╟ур©у╦Я

@@ -78,7 +78,7 @@ struct ARTSPConnection : public AHandler {
 	void postReceiveRequestEvent();
 	void StartListen(int socket,handler_id handlerID,uint32_t mtempSessionID);	
     State mState;
-    uint32_t mSessionID;
+    int32_t mSessionID;
 //	int mSocketAccept;
     int mSocket;	
 	pthread_t mTID;
