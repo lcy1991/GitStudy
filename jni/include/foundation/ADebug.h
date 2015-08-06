@@ -58,10 +58,11 @@ void PrintLog(const char *format, ...)
 	va_end(ap);
 	fflush(logfp);
 }	*/
-#define LOGF(tag, format, args...) printf(format,##args)
-#define LOGE(tag, format, args...) printf(format,##args)
-#define LOGW(tag, format, args...) printf(format,##args)
-#define LOGI(tag, format, args...) printf(format,##args)
+#define LOGF(tag, format, args...) printf("[%s@%s,%d]"format"\n",__func__, __FILE__, __LINE__,##args)
+#define LOGE(tag, format, args...) printf("[%s@%s,%d]"format"\n",__func__, __FILE__, __LINE__,##args)
+#define LOGW(tag, format, args...) printf("[%s@%s,%d]"format"\n",__func__, __FILE__, __LINE__,##args)
+#define LOGI(tag, format, args...) printf("[%s@%s,%d]"format"\n",__func__, __FILE__, __LINE__,##args)
+
 #endif
 #else
 #define LOGF(tag, format, args...)
