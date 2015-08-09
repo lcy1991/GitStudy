@@ -32,6 +32,9 @@ enum State {
 	DISCONNECTED,
 	CONNECTING,
 	CONNECTED,
+	INIT,
+	READY,
+	PLAYING,	
 };
 
 enum {
@@ -71,7 +74,7 @@ struct ARTSPConnection : public AHandler {
     void connect(const char *url, const sp<AMessage> &reply);
     void disconnect(const sp<AMessage> &reply);
 
-    void sendResponse(const char *response, const sp<AMessage> &reply);
+    void sendResponse(const char *responses);
 
     void observeBinaryData(const sp<AMessage> &reply);
 	

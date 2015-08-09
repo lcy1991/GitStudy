@@ -8,14 +8,15 @@
 int main()
 {
 	uint32_t i;
-	char* tmp = "1234567890";
+	char* tmp = "1234567890\r\n1234567";
 	handler_1* handler1 = new handler_1();
 	handler_1* handler2 = new handler_1();
 	ALooper* looper1 =  new ALooper;
 	ALooper* looper2 =  new ALooper;
-	AString* astring = new AString(tmp,3);
-	ssize_t space1 = astring->find("3");
+	AString* astring = new AString(tmp,19);
+	ssize_t space1 = astring->find("\r\n");
 	LOGI("log_tag","status: %s %d\n", astring->c_str(),space1);
+		//return 0;
 	looper1->registerHandler(handler1);
 	looper2->registerHandler(handler2);
 	handler1->setTarget(handler2->id());

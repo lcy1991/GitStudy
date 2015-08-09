@@ -41,6 +41,9 @@ void MyRTSPHandler::onReceiveRequest(const sp<AMessage> &msg)
 	int32_t sessionID=0 ;
 	ARTSPConnection* Conn;
 	AString method;
+	AString cseq;
+	int cseqNum;
+	AString response;
 	ReqMethod ReqMethodNum;
 	map<uint32_t,ARTSPConnection*>::iterator iter;
 
@@ -60,7 +63,9 @@ void MyRTSPHandler::onReceiveRequest(const sp<AMessage> &msg)
     	return;
 	}
 	msg->findString("Method",&method);
-	LOGI(LOG_TAG,"findString Method %s",method.c_str());
+	msg->findString("CSeq",&cseq);
+	cseqNum = atoi(cseq.c_str());
+	LOGI(LOG_TAG,"findString Method %s CSeq %d",method.c_str(),cseqNum);
 	do{
 		if(strcmp(method.c_str(),"DESCRIBE")==0)
 			{
@@ -68,8 +73,15 @@ void MyRTSPHandler::onReceiveRequest(const sp<AMessage> &msg)
 				LOGI(LOG_TAG,"ReqNum %d\n",DESCRIBE);
 				break;
 			}
-		if (strcmp(method.c_str(),"OPTION")==0)
+		if (strcmp(method.c_str(),"OPTIONS")==0)
 			{
+				response.append("RTSP/1.0 200 OK\r\n");
+				response.append("CSeq: ");
+				response.append(cseqNum);
+				response.append("\r\n");
+				response.append("Public: DESCRIBE, SETUP, TEARDOWN, PLAY, PAUSE\r\n\r\n");
+				LOGI(LOG_TAG,"%s",response.c_str());
+				Conn->sendResponse(response.c_str());
 				ReqMethodNum = OPTION;
 				break;
 			}

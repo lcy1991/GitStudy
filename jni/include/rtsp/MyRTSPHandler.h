@@ -55,4 +55,13 @@ private:
 	
 };
 
+/*
+Authorization: Digest username="test1", realm="Streaming Server", nonce="a72a7266d6f903a8384b874d3e29e666", uri="/sample_100kbit.mp4", response="f92167a7e9f64fb45d5dffd39f73f91f"\r\n
+
+WWW-Authenticate: Digest realm="StreamingServer", nonce="a72a7266d6f903a8384b874d3e29e666"\r\n
+
+*/
+
+
+
 #endif

@@ -59,10 +59,9 @@ void ARTSPConnection::disconnect(const sp<AMessage> &reply) {
 
 //liuchangyou
 void ARTSPConnection::sendResponse(
-        const char *response, const sp<AMessage> &reply) {
+        const char *response) {
     sp<AMessage> msg = new AMessage(kWhatSendResponse, id());
     msg->setString("response", response);
-    msg->setMessage("reply", reply);
     msg->post();
 }
 
@@ -87,6 +86,10 @@ void ARTSPConnection::onMessageReceived(const sp<AMessage> &msg) {
         case kWhatReceiveRequest:
             onReceiveRequest();
             break;
+
+        case kWhatSendResponse:
+            onSendResponse(msg);
+            break;			
 
         case kWhatObserveBinaryData:
         {
@@ -268,14 +271,15 @@ void ARTSPConnection::onCompleteConnection(const sp<AMessage> &msg) {
 
 //liluchangyou
 void ARTSPConnection::onSendResponse(const sp<AMessage> &msg) {
-    sp<AMessage> reply;
-    CHECK(msg->findMessage("reply", &reply));
+ /*   sp<AMessage> reply;
+   CHECK(msg->findMessage("reply", &reply));
 
     if (mState != CONNECTED) {
         reply->setInt32("result", -ENOTCONN);
         reply->post();
-        return;
-    }
+		//
+       return;
+    }*/
 
     AString response;
     CHECK(msg->findString("response", &response));
@@ -286,13 +290,13 @@ void ARTSPConnection::onSendResponse(const sp<AMessage> &msg) {
 
     int32_t cseq = mNextCSeq++;
 
-    AString cseqHeader = "CSeq: ";
-    cseqHeader.append(cseq);
-    cseqHeader.append("\r\n");
+//    AString cseqHeader = "CSeq: ";
+//    cseqHeader.append(cseq);
+//    cseqHeader.append("\r\n");
 
-    response.insert(cseqHeader, i + 2);
+//    response.insert(cseqHeader, i + 2);
 
-    LOGI(LOG_TAG,"response: '%s'", response.c_str());
+    LOGI(LOG_TAG,"response:\n%s", response.c_str());
 
     size_t numBytesSent = 0;
     while (numBytesSent < response.size()) {
@@ -301,11 +305,11 @@ void ARTSPConnection::onSendResponse(const sp<AMessage> &msg) {
                  response.size() - numBytesSent, 0);
 
         if (n == 0) {
-            // Server closed the connection.
+            // Client closed the connection.
             LOGE(LOG_TAG,"Client unexpectedly closed the connection.");
 
-            reply->setInt32("result", -1);
-            reply->post();
+           // reply->setInt32("result", -1);
+           // reply->post();
             return;
         } else if (n < 0) {
             if (errno == EINTR) {
@@ -313,14 +317,14 @@ void ARTSPConnection::onSendResponse(const sp<AMessage> &msg) {
             }
 
             LOGE(LOG_TAG,"Error sending rtsp response.");
-            reply->setInt32("result", -errno);
-            reply->post();
+           // reply->setInt32("result", -errno);
+           // reply->post();
             return;
         }
 
         numBytesSent += (size_t)n;
     }
-	reply->post();//上一层收到发送结果成功或失败
+	//reply->post();//上一层收到发送结果成功或失败
 //    mPendingRequests.add(cseq, reply);//等待服务器回应，返回发送结果服务器应不做回应，只发送相应
 }
 
@@ -378,7 +382,8 @@ status_t ARTSPConnection::receive(void *data, size_t size) {
 //		LOGE(LOG_TAG,"recv %d byte %c\n",n,*(uint8_t *)data);//lcy sdebug
         if (n == 0) {
             // Server closed the connection.
-            LOGE(LOG_TAG,"Server unexpectedly closed the connection.");
+            LOGE(LOG_TAG,"Client unexpectedly closed the connection.");
+			mState = DISCONNECTED;
             return -1;
         } else if (n < 0) {
             if (errno == EINTR) {
@@ -455,8 +460,6 @@ bool ARTSPConnection::receiveRTSPRequest() {
             break;
         }
 
-        LOGI(LOG_TAG,"line: %s\n", line.c_str());
-
         ssize_t colonPos = line.find(":");
         if (colonPos < 0) {
             // Malformed header line.
@@ -465,10 +468,12 @@ bool ARTSPConnection::receiveRTSPRequest() {
 
         AString key(line, 0, colonPos);
         key.trim();
-        key.tolower();
+       // key.tolower();
 
         line.erase(0, colonPos + 1);
         line.trim();
+		
+        LOGI(LOG_TAG,"line: %s:%s\n", key.c_str(),line.c_str());
 
 	    request->setString(key.c_str(),line.c_str());	
     }
