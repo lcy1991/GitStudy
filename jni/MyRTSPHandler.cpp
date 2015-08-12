@@ -1,16 +1,21 @@
 #include "rtsp/MyRTSPHandler.h"
+#include "rtsp/md5.h"
+#include "rtsp/uuid.h"
 
 #include <arpa/inet.h>
 #include <fcntl.h>
 #include <unistd.h>
 #include <netdb.h>
-#include <openssl/md5.h>
 #include <sys/socket.h>
 #include <errno.h>
 
 
 #define RTSP_PORT 554
 #define LOG_TAG __FUNCTION__
+const char* passwd = "abc";
+const char* user = "abc";
+const char* realm = "android";
+const char* uri="/ch0/live";
 MyRTSPHandler::MyRTSPHandler()
 	: mRunningFlag(false),
 	  session_id(0),
@@ -42,9 +47,13 @@ void MyRTSPHandler::onReceiveRequest(const sp<AMessage> &msg)
 	ARTSPConnection* Conn;
 	AString method;
 	AString cseq;
+	AString tmpStr;
+	AString URI;
 	int cseqNum;
 	AString response;
 	ReqMethod ReqMethodNum;
+	uuid_t uuid;
+	char randomID[33];
 	map<uint32_t,ARTSPConnection*>::iterator iter;
 
 	msg->findInt32("SessionID",&sessionID);
@@ -65,12 +74,38 @@ void MyRTSPHandler::onReceiveRequest(const sp<AMessage> &msg)
 	msg->findString("Method",&method);
 	msg->findString("CSeq",&cseq);
 	cseqNum = atoi(cseq.c_str());
-	LOGI(LOG_TAG,"findString Method %s CSeq %d",method.c_str(),cseqNum);
+	LOGI(LOG_TAG,"findString Method %s CSeq %d URI:%s",method.c_str(),cseqNum,URI.c_str());
 	do{
 		if(strcmp(method.c_str(),"DESCRIBE")==0)
 			{
 				ReqMethodNum = DESCRIBE;
-				LOGI(LOG_TAG,"ReqNum %d\n",DESCRIBE);
+				msg->findString("URI",&URI);
+				if(passwd!=""&&user!="")
+					{
+						if(msg->findString("Authorization",&tmpStr)==false)
+							{
+								uuid_generate(uuid);
+								sprintf(randomID,"%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x",
+									uuid[0],uuid[1],uuid[2],uuid[3],uuid[4],uuid[5],uuid[6],uuid[7],
+									uuid[8],uuid[9],uuid[10],uuid[11],uuid[12],uuid[13],uuid[14],uuid[15]);
+								response.append("RTSP/1.0 401 Unauthorized\r\n");
+								response.append("CSeq: ");
+								response.append(cseqNum);
+								response.append("\r\n");
+								response.append("WWW-Authenticate: Digest realm=\"");
+								response.append(realm);
+								response.append("\",nonce=\"");
+								response.append(randomID);
+								response.append("\"\r\n\r\n");
+								//LOGI(LOG_TAG,"%s",response.c_str());
+								Conn->sendResponse(response.c_str());
+							}
+						else
+							{
+								
+							}					
+					}
+
 				break;
 			}
 		if (strcmp(method.c_str(),"OPTIONS")==0)
@@ -208,4 +243,7 @@ void* MyRTSPHandler::NewSession(void* arg)
 	notify->post();
 	LOGI(LOG_TAG,"session closed\n");
 }
+
+
+
 
