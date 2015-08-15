@@ -1,5 +1,5 @@
 #include "rtsp/MyRTSPHandler.h"
-#include "rtsp/md5.h"
+#include "our_md5.h"
 #include "rtsp/uuid.h"
 
 #include <arpa/inet.h>
@@ -16,12 +16,26 @@ const char* passwd = "abc";
 const char* user = "abc";
 const char* realm = "android";
 const char* uri="/ch0/live";
+//向服务器发送心跳包
 MyRTSPHandler::MyRTSPHandler()
 	: mRunningFlag(false),
 	  session_id(0),
 	  mtempSessionID(0)
 {
-
+	AString tmpStr;
+	char hostip[40];
+	getHostIP(hostip);
+	mURI.append("rtsp://");
+	mURI.append(hostip);
+	mURI.append(uri);
+	LOGI(LOG_TAG,"uri--->%s",mURI.c_str());
+	tmpStr.append(user);
+	tmpStr.append(":");
+	tmpStr.append(realm);
+	tmpStr.append(":");
+	tmpStr.append(passwd);
+	//md5(username:realm:password)
+	MD5_encode(tmpStr.c_str(),mMD5part1);
 }
 MyRTSPHandler::~MyRTSPHandler()
 {
@@ -74,20 +88,22 @@ void MyRTSPHandler::onReceiveRequest(const sp<AMessage> &msg)
 	msg->findString("Method",&method);
 	msg->findString("CSeq",&cseq);
 	cseqNum = atoi(cseq.c_str());
-	LOGI(LOG_TAG,"findString Method %s CSeq %d URI:%s",method.c_str(),cseqNum,URI.c_str());
+	
 	do{
 		if(strcmp(method.c_str(),"DESCRIBE")==0)
 			{
 				ReqMethodNum = DESCRIBE;
 				msg->findString("URI",&URI);
+				LOGI(LOG_TAG,"findString Method %s CSeq %d URI:%s",method.c_str(),cseqNum,URI.c_str());
 				if(passwd!=""&&user!="")
 					{
-						if(msg->findString("Authorization",&tmpStr)==false)
+						if(msg->findString("Authorization",&tmpStr)==false)//no Authorization
 							{
 								uuid_generate(uuid);
 								sprintf(randomID,"%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x",
 									uuid[0],uuid[1],uuid[2],uuid[3],uuid[4],uuid[5],uuid[6],uuid[7],
 									uuid[8],uuid[9],uuid[10],uuid[11],uuid[12],uuid[13],uuid[14],uuid[15]);
+								Conn->setNonce(randomID);
 								response.append("RTSP/1.0 401 Unauthorized\r\n");
 								response.append("CSeq: ");
 								response.append(cseqNum);
@@ -102,7 +118,17 @@ void MyRTSPHandler::onReceiveRequest(const sp<AMessage> &msg)
 							}
 						else
 							{
+								AString Digest;
+								ssize_t resp;
+								resp = tmpStr.find("response");
 								
+								AString response(tmpStr, resp + 10, 32);
+								LOGI(LOG_TAG,"~~~Client's response %s",response.c_str());
+								getDigest(Conn->getNonce(),"DESCRIBE",&Digest);
+								if(Digest==response)
+									{
+										LOGI(LOG_TAG,"Authenticate passed !!!!");
+									}
 							}					
 					}
 
@@ -243,6 +269,110 @@ void* MyRTSPHandler::NewSession(void* arg)
 	notify->post();
 	LOGI(LOG_TAG,"session closed\n");
 }
+
+// response= md5(md5(username:realm:password):nonce:md5(public_method:url));
+//abc:android:abc  = 574a1ebcaf81a21a01092636d1582b1f
+//                           b44f39a0dcbd440e860b8f1815638fb6
+//DESCRIBE:rtsp://192.168.1.107/ch0/live=1d40b969f0d92be5e2c79d5fb923104a
+//574a1ebcaf81a21a01092636d1582b1f:b44f39a0dcbd440e860b8f1815638fb6:1d40b969f0d92be5e2c79d5fb923104a
+//	=7c640e624ad19b77b6c5602629dd8094
+
+/*
+[getDigest@MyRTSPHandler.cpp,286]mMD5part1:574a1ebcaf81a21a01092636d1582b1f
+[getDigest@MyRTSPHandler.cpp,289]NONCE:b147fd896c934795bed8f09bce7e83ef
+[getDigest@MyRTSPHandler.cpp,295]part3_md5:1d40b969f0d92be5e2c79d5fb923104a
+[getDigest@MyRTSPHandler.cpp,301]Digest result:11333c4478d15f15a99a9f89fdcfb531
+
+574a1ebcaf81a21a01092636d1582b1f:b147fd896c934795bed8f09bce7e83ef:1d40b969f0d92be5e2c79d5fb923104a
+*/
+//]Client's Authenticate Digest username="abc", realm="android", nonce="b44f39a0dcbd440e860b8f1815638fb6", uri="rtsp://192.168.1.107/ch0/live", response="7c640e624ad19b77b6c5602629dd8094"
+//[getDigest@MyRTSPHandler.cpp,286]Digest result:36d625d525096e13c000e54c02ff75a7
+
+void MyRTSPHandler::getDigest(const char* NONCE,const char* public_method,AString *result)
+{
+	AString tmpStr;
+	AString part3;
+	char part3_md5[33];
+	char ret[33];
+	tmpStr.append(mMD5part1);
+	LOGI(LOG_TAG,"mMD5part1:%s",mMD5part1);
+	tmpStr.append(":");
+	tmpStr.append(NONCE);
+	LOGI(LOG_TAG,"NONCE:%s",NONCE);
+	tmpStr.append(":");
+	part3.append(public_method);
+	part3.append(":");
+	part3.append(mURI);
+	MD5_encode(part3.c_str(),part3_md5);
+	LOGI(LOG_TAG,"part3_md5:%s",part3_md5);
+	
+	tmpStr.append(part3_md5);
+	LOGI(LOG_TAG,"[response]:%s",tmpStr.c_str());
+	MD5_encode(tmpStr.c_str(),ret);
+	
+	result->setTo(ret);
+	LOGI(LOG_TAG,"Digest result:%s",ret);
+}
+
+
+#ifdef ANDROID   
+int MyRTSPHandler::getHostIP (char addressBuffer[40]) 
+{
+	sprintf(addressBuffer,"%s","192.168.1.100");
+	return 0;
+}
+
+#else
+#include <ifaddrs.h>
+#include <unistd.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <signal.h>
+#include <time.h>
+#include <sys/types.h>
+#include <sys/vfs.h>
+#include <sys/stat.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
+#include <netdb.h>
+
+int MyRTSPHandler::getHostIP(char addressBuffer[40]) 
+{
+
+    struct ifaddrs * ifAddrStruct=NULL;
+    void * tmpAddrPtr=NULL;
+
+    getifaddrs(&ifAddrStruct);
+
+    while (ifAddrStruct!=NULL) 
+	{
+        if (ifAddrStruct->ifa_addr->sa_family==AF_INET)
+		{   // check it is IP4
+            // is a valid IP4 Address
+            tmpAddrPtr = &((struct sockaddr_in *)ifAddrStruct->ifa_addr)->sin_addr;
+			if(strcmp(ifAddrStruct->ifa_name,"eth0")==0)
+				{
+					inet_ntop(AF_INET, tmpAddrPtr, addressBuffer, INET_ADDRSTRLEN);
+            		//printf("%s IPV4 Address %s\n", ifAddrStruct->ifa_name, addressBuffer); 
+           			break;
+				}
+
+        }
+		else if (ifAddrStruct->ifa_addr->sa_family==AF_INET6)
+		{   // check it is IP6
+            // is a valid IP6 Address
+            //tmpAddrPtr=&((struct sockaddr_in *)ifAddrStruct->ifa_addr)->sin_addr;
+            //char addressBuffer[INET6_ADDRSTRLEN];
+            //inet_ntop(AF_INET6, tmpAddrPtr, addressBuffer, INET6_ADDRSTRLEN);
+            //printf("%s IPV6 Address %s\n", ifAddrStruct->ifa_name, addressBuffer); 
+        } 
+        ifAddrStruct = ifAddrStruct->ifa_next;
+    }
+    return 0;
+}
+#endif
 
 
 

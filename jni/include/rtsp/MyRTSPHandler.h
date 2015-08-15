@@ -34,12 +34,14 @@ struct MyRTSPHandler : public AHandler
 	void StopServer();
 	MyRTSPHandler();
     virtual ~MyRTSPHandler();
+	int getHostIP (char addressBuffer[40]) ;
 	bool mRunningFlag;
 	map<uint32_t,ARTSPConnection*> mSessions;//<session_id,ARTSPConnection pointer>
 protected:
 static void* NewSession(void* arg);
 virtual void onMessageReceived(const sp<AMessage> &msg);
 	void onReceiveRequest(const sp<AMessage> &msg);
+	void getDigest(const char* NONCE,const char* public_method,AString *result);
 	int mSocket;
 	int mSocketAccept;
     uint32_t session_id;
@@ -51,6 +53,9 @@ private:
 	    enum {
         kwhatCloseSession   = 'clse',
     };
+	char mMD5part1[33];
+	char mMD5part3[33];
+	AString mURI;
 
 	
 };

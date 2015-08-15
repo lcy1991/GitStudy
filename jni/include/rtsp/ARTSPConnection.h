@@ -71,7 +71,9 @@ struct ARTSPRequest : public LightRefBase<ARTSPRequest> {              //«Î«Ûœ˚œ
 struct ARTSPConnection : public AHandler {
     ARTSPConnection();
 	void listening(const sp<AMessage> &reply);
+	
     void connect(const char *url, const sp<AMessage> &reply);
+	
     void disconnect(const sp<AMessage> &reply);
 
     void sendResponse(const char *responses);
@@ -79,7 +81,12 @@ struct ARTSPConnection : public AHandler {
     void observeBinaryData(const sp<AMessage> &reply);
 	
 	void postReceiveRequestEvent();
+	
 	void StartListen(int socket,handler_id handlerID,uint32_t mtempSessionID);	
+
+	void setNonce(const char * nonce);
+
+	const char* getNonce();
     State mState;
     int32_t mSessionID;
 //	int mSocketAccept;

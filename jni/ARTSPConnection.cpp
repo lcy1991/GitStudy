@@ -28,7 +28,7 @@
 #include <fcntl.h>
 #include <unistd.h>
 #include <netdb.h>
-#include <openssl/md5.h>
+//#include <openssl/md5.h>
 #include <sys/socket.h>
 #include <errno.h>
 
@@ -484,5 +484,15 @@ bool ARTSPConnection::receiveRTSPRequest() {
 	return OK;
 }
 
+
+void ARTSPConnection::setNonce(const char * nonce)
+{
+	mNonce.setTo(nonce);
+}
+
+const char* ARTSPConnection::getNonce()
+{
+	return mNonce.c_str();
+}
 
 
