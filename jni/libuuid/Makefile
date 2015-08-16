@@ -18,7 +18,7 @@ CC=gcc
 CFLAGS=-Wno-multichar
 
 ifeq ($(ARCH),$(BIT64))
-FLAG64=-fPIC
+#FLAG64=-fPIC
 endif
 
 INCLUDES= -I./
@@ -33,7 +33,7 @@ libuuid.a:$(OBJ)
 	mv libuuid.a ../libuuid.a
 	
 $(OBJ): %.o: %.c
-	$(CC) -c $(FLAG64) $(CFLAGS) $(INCLUDES) $< -o $@
+	$(CC) -c $(FLAG64) $(CFLAGS)  $< -o $@
 .PHONY:clean
 clean:
 	rm -f *.o ../libuuid.a

@@ -40,7 +40,11 @@ struct MyRTSPHandler : public AHandler
 protected:
 static void* NewSession(void* arg);
 virtual void onMessageReceived(const sp<AMessage> &msg);
+
 	void onReceiveRequest(const sp<AMessage> &msg);
+
+	void onCloseSession(const sp<AMessage> &msg);
+	
 	void getDigest(const char* NONCE,const char* public_method,AString *result);
 	int mSocket;
 	int mSocketAccept;

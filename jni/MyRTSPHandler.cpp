@@ -47,12 +47,31 @@ void MyRTSPHandler::onMessageReceived(const sp<AMessage> &msg)
 	switch(msg->what())
 		{
 			case kwhatCloseSession:
+				onCloseSession(msg);
 				break;
 			case kWhatRequest:
 				LOGI(LOG_TAG,"MyRTSPHandler receive client request\n");
 				onReceiveRequest(msg);
 			    break;
 		}
+}
+void MyRTSPHandler::onCloseSession(const sp<AMessage> &msg)
+{
+	int32_t sessionID = 0 ;
+	ARTSPConnection* Conn;
+	map<uint32_t,ARTSPConnection*>::iterator iter;
+	msg->findInt32("sessionID",&sessionID);
+	iter = mSessions.find(sessionID);	
+	if(iter != mSessions.end()){
+		Conn = iter->second;
+	    if (Conn != NULL) {
+			delete Conn;
+	        LOGI(LOG_TAG,"Session %d is deleted",sessionID);
+	        mSessions.erase(iter);
+	        return;
+		}
+	}
+	else LOGI(LOG_TAG,"Can not find the session %d!",sessionID);
 }
 
 void MyRTSPHandler::onReceiveRequest(const sp<AMessage> &msg)
@@ -71,7 +90,7 @@ void MyRTSPHandler::onReceiveRequest(const sp<AMessage> &msg)
 	map<uint32_t,ARTSPConnection*>::iterator iter;
 
 	msg->findInt32("SessionID",&sessionID);
-	LOGW(LOG_TAG,"findInt32 SessionID %d\n",sessionID);
+//	LOGW(LOG_TAG,"findInt32 SessionID %d\n",sessionID);
 	iter = mSessions.find(sessionID);	
 	if(iter != mSessions.end()){
 		Conn = iter->second;
@@ -244,27 +263,10 @@ void* MyRTSPHandler::NewSession(void* arg)
 	sp<AMessage> notify = new AMessage(kwhatCloseSession,handlerPt->id());
 	notify->setInt32("sessionID",rtspConn->mSessionID);
 	notify->post();
-	LOGI(LOG_TAG,"session closed\n");
+	LOGI(LOG_TAG,"session %d is closed\n",rtspConn->mSessionID);
 }
 
 // response= md5(md5(username:realm:password):nonce:md5(public_method:url));
-//abc:android:abc  = 574a1ebcaf81a21a01092636d1582b1f
-//                           b44f39a0dcbd440e860b8f1815638fb6
-//DESCRIBE:rtsp://192.168.1.107/ch0/live=1d40b969f0d92be5e2c79d5fb923104a
-//574a1ebcaf81a21a01092636d1582b1f:b44f39a0dcbd440e860b8f1815638fb6:1d40b969f0d92be5e2c79d5fb923104a
-//	=7c640e624ad19b77b6c5602629dd8094
-
-/*
-[getDigest@MyRTSPHandler.cpp,286]mMD5part1:574a1ebcaf81a21a01092636d1582b1f
-[getDigest@MyRTSPHandler.cpp,289]NONCE:b147fd896c934795bed8f09bce7e83ef
-[getDigest@MyRTSPHandler.cpp,295]part3_md5:1d40b969f0d92be5e2c79d5fb923104a
-[getDigest@MyRTSPHandler.cpp,301]Digest result:11333c4478d15f15a99a9f89fdcfb531
-
-574a1ebcaf81a21a01092636d1582b1f:b147fd896c934795bed8f09bce7e83ef:1d40b969f0d92be5e2c79d5fb923104a
-*/
-//]Client's Authenticate Digest username="abc", realm="android", nonce="b44f39a0dcbd440e860b8f1815638fb6", uri="rtsp://192.168.1.107/ch0/live", response="7c640e624ad19b77b6c5602629dd8094"
-//[getDigest@MyRTSPHandler.cpp,286]Digest result:36d625d525096e13c000e54c02ff75a7
-
 void MyRTSPHandler::getDigest(const char* NONCE,const char* public_method,AString *result)
 {
 	AString tmpStr;

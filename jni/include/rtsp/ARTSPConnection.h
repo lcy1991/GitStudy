@@ -70,6 +70,9 @@ struct ARTSPRequest : public LightRefBase<ARTSPRequest> {              //«Î«Ûœ˚œ
 
 struct ARTSPConnection : public AHandler {
     ARTSPConnection();
+
+	virtual ~ARTSPConnection();
+	
 	void listening(const sp<AMessage> &reply);
 	
     void connect(const char *url, const sp<AMessage> &reply);
@@ -95,7 +98,7 @@ struct ARTSPConnection : public AHandler {
 	pthread_t mTID;
 
 protected:
-    virtual ~ARTSPConnection();
+    
     virtual void onMessageReceived(const sp<AMessage> &msg);
 
 private:
@@ -109,17 +112,11 @@ private:
 
 
 	uint32_t mConnectedNum;
-	map<pthread_t, int> mConnectSocket;//<pthread_t_ID,socketfd>
     AString mUser, mPass;
     AuthType mAuthType;
     AString mNonce;
 
-	int mSocket_listen;
-	int mSocket_client;
-
-
 	handler_id mhandlerID;// request msg target
-    int32_t mNextCSeq;
 	bool mReceiveRequestEventPending;
 
     map<int32_t, sp<AMessage> > mPendingRequests;

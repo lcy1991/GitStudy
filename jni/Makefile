@@ -24,13 +24,13 @@ FLAG64=-fPIC
 endif
 
 INCLUDES= -I./include/
-LDLIBS= -lpthread -luuid
+LDLIBS= -L. -lpthread -luuid
 test:test.cpp libstagefright_foundation.so
-	$(CC)  $(FLAG64) $(CFLAGS) $(INCLUDES) test.cpp  libstagefright_foundation.so -lpthread -luuid -o test
+	$(CC)  $(FLAG64) $(CFLAGS) $(INCLUDES) test.cpp  libstagefright_foundation.so -lpthread -o test
 libstagefright_foundation.so:$(OBJ)
-	$(CC) -shared  $(FLAG64) $(LDLIBS) $(OBJ) -o libstagefright_foundation.so 	
+	$(CC) -shared  $(FLAG64)  $(OBJ) $(LDLIBS) -o libstagefright_foundation.so 	
 $(OBJ): %.o: %.cpp
 	$(CC) -c $(FLAG64) $(CFLAGS) $(INCLUDES)  $< -o $@
 .PHONY:clean
 clean:
-	rm -f *.o libstagefright_foundation.so test
+	rm -f *.o libstagefright_foundation.s

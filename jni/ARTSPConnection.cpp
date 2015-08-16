@@ -39,7 +39,6 @@ ARTSPConnection::ARTSPConnection()
     : mState(CONNECTED),
       mAuthType(NONE),
       mSocket(-1),
-      mNextCSeq(0),
       mReceiveRequestEventPending(false) {
 }
 
@@ -261,7 +260,7 @@ void ARTSPConnection::onCompleteConnection(const sp<AMessage> &msg) {
     } else {
         reply->setInt32("result", OK);
         mState = CONNECTED;
-        mNextCSeq = 1;
+
 
 //        postReceiveReponseEvent();
     }
@@ -288,7 +287,6 @@ void ARTSPConnection::onSendResponse(const sp<AMessage> &msg) {
     ssize_t i = response.find("\r\n\r\n");
     CHECK_GE(i, 0);
 
-    int32_t cseq = mNextCSeq++;
 
 //    AString cseqHeader = "CSeq: ";
 //    cseqHeader.append(cseq);
