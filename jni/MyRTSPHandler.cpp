@@ -58,17 +58,20 @@ void MyRTSPHandler::onMessageReceived(const sp<AMessage> &msg)
 void MyRTSPHandler::onCloseSession(const sp<AMessage> &msg)
 {
 	int32_t sessionID = 0 ;
+	int32_t result = 0 ;
 	ARTSPConnection* Conn;
+//	return;
 	map<uint32_t,ARTSPConnection*>::iterator iter;
 	msg->findInt32("sessionID",&sessionID);
+	msg->findInt32("result",&result);
 	iter = mSessions.find(sessionID);	
 	if(iter != mSessions.end()){
 		Conn = iter->second;
 	    if (Conn != NULL) {
+			mlooper.unregisterHandler(Conn->id());
 			delete Conn;
-	        LOGI(LOG_TAG,"Session %d is deleted",sessionID);
+	        LOGI(LOG_TAG,"Session %d is deleted ,result %d",sessionID,result);
 	        mSessions.erase(iter);
-	        return;
 		}
 	}
 	else LOGI(LOG_TAG,"Can not find the session %d!",sessionID);
@@ -169,11 +172,6 @@ void MyRTSPHandler::onReceiveRequest(const sp<AMessage> &msg)
 				ReqMethodNum = SET_PARAMETER;
 				break;
 			}
-		if (strcmp(method.c_str(),"REDIRECT")==0)
-			{
-				ReqMethodNum = REDIRECT;
-				break;
-			}
 
 	}while(0);
 
@@ -228,11 +226,19 @@ void MyRTSPHandler::StartServer()
 	while(mRunningFlag)
 		{
 		   //mSocketAccept需要锁保护
-		    pthread_mutex_lock(&mMutex);
+		    //pthread_mutex_lock(&mMutex);
 		    LOGI(LOG_TAG,"rtsp Start accept\n");
 			mSocketAccept = accept(mSocket,NULL,NULL);
 			mtempSessionID++;
-			pthread_create(&mtempTID,NULL,NewSession,(void *)this);		
+			
+			ARTSPConnection* rtspConn = new ARTSPConnection();
+			mSessions.insert(make_pair(mtempSessionID, rtspConn));
+			mlooper.registerHandler(rtspConn);
+			rtspConn->StartListen(mSocketAccept,id(),mtempSessionID);
+
+
+			
+			//pthread_create(&mtempTID,NULL,NewSession,(void *)this);		
 			LOGE(LOG_TAG,"mtempSessionID[%d]\n",mtempSessionID);			
 		}
 

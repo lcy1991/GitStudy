@@ -47,6 +47,7 @@ enum {
 	kWhatReceiveRequest 	= 'rreq',
 	kWhatObserveBinaryData	= 'obin',
 	kWhatRequest			= 'requ',
+	kwhatCloseSession       = 'clse',
 };
 
 

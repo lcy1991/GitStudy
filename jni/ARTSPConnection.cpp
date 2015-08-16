@@ -270,29 +270,14 @@ void ARTSPConnection::onCompleteConnection(const sp<AMessage> &msg) {
 
 //liluchangyou
 void ARTSPConnection::onSendResponse(const sp<AMessage> &msg) {
- /*   sp<AMessage> reply;
-   CHECK(msg->findMessage("reply", &reply));
-
-    if (mState != CONNECTED) {
-        reply->setInt32("result", -ENOTCONN);
-        reply->post();
-		//
-       return;
-    }*/
 
     AString response;
+	sp<AMessage> notify;
     CHECK(msg->findString("response", &response));
 
     // Find the boundary between headers and the body.
     ssize_t i = response.find("\r\n\r\n");
     CHECK_GE(i, 0);
-
-
-//    AString cseqHeader = "CSeq: ";
-//    cseqHeader.append(cseq);
-//    cseqHeader.append("\r\n");
-
-//    response.insert(cseqHeader, i + 2);
 
     LOGI(LOG_TAG,"response:\n%s", response.c_str());
 
@@ -305,18 +290,22 @@ void ARTSPConnection::onSendResponse(const sp<AMessage> &msg) {
         if (n == 0) {
             // Client closed the connection.
             LOGE(LOG_TAG,"Client unexpectedly closed the connection.");
-
-           // reply->setInt32("result", -1);
-           // reply->post();
+			mState = DISCONNECTED;
+			notify = new AMessage(kwhatCloseSession,mhandlerID);
+			notify->setInt32("result",-1);
+			notify->setInt32("sessionID",mSessionID);
+			notify->post();		
             return;
         } else if (n < 0) {
             if (errno == EINTR) {
                 continue;
             }
-
+			mState = DISCONNECTED;
             LOGE(LOG_TAG,"Error sending rtsp response.");
-           // reply->setInt32("result", -errno);
-           // reply->post();
+			notify = new AMessage(kwhatCloseSession,mhandlerID);
+			notify->setInt32("result",errno );
+			notify->setInt32("sessionID",mSessionID);
+			notify->post();		
             return;
         }
 
@@ -375,6 +364,7 @@ void ARTSPConnection::postReceiveRequestEvent() {
 
 status_t ARTSPConnection::receive(void *data, size_t size) {
     size_t offset = 0;
+	sp<AMessage> notify;
     while (offset < size) {
         ssize_t n = recv(mSocket, (uint8_t *)data + offset, size - offset, 0);
 //		LOGE(LOG_TAG,"recv %d byte %c\n",n,*(uint8_t *)data);//lcy sdebug
@@ -382,13 +372,22 @@ status_t ARTSPConnection::receive(void *data, size_t size) {
             // Server closed the connection.
             LOGE(LOG_TAG,"Client unexpectedly closed the connection.");
 			mState = DISCONNECTED;
+			notify = new AMessage(kwhatCloseSession,mhandlerID);
+			notify->setInt32("result",-1);
+			notify->setInt32("sessionID",mSessionID);
+			notify->post();			
+			
             return -1;
         } else if (n < 0) {
             if (errno == EINTR) {
                 continue;
             }
-
+			mState = DISCONNECTED;
             LOGE(LOG_TAG,"Error reading rtsp response.");
+			notify = new AMessage(kwhatCloseSession,mhandlerID);
+			notify->setInt32("result",-1);
+			notify->setInt32("sessionID",mSessionID);
+			notify->post();	
             return -errno;
         }
 
