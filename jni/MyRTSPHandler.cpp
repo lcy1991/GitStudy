@@ -99,36 +99,13 @@ void MyRTSPHandler::onReceiveRequest(const sp<AMessage> &msg)
 					{
 						if(msg->findString("Authorization",&tmpStr)==false)//no Authorization
 							{
-								uuid_generate(uuid);
-								sprintf(randomID,"%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x",
-									uuid[0],uuid[1],uuid[2],uuid[3],uuid[4],uuid[5],uuid[6],uuid[7],
-									uuid[8],uuid[9],uuid[10],uuid[11],uuid[12],uuid[13],uuid[14],uuid[15]);
-								Conn->setNonce(randomID);
-								response.append("RTSP/1.0 401 Unauthorized\r\n");
-								response.append("CSeq: ");
-								response.append(cseqNum);
-								response.append("\r\n");
-								response.append("WWW-Authenticate: Digest realm=\"");
-								response.append(realm);
-								response.append("\",nonce=\"");
-								response.append(randomID);
-								response.append("\"\r\n\r\n");
-								//LOGI(LOG_TAG,"%s",response.c_str());
-								Conn->sendResponse(response.c_str());
+								sendUnauthenticatedResponse(Conn,cseqNum);
 							}
 						else
 							{
-								AString Digest;
-								ssize_t resp;
-								resp = tmpStr.find("response");
-								
-								AString response(tmpStr, resp + 10, 32);
-								LOGI(LOG_TAG,"~~~Client's response %s",response.c_str());
-								getDigest(Conn->getNonce(),"DESCRIBE",&Digest);
-								if(Digest==response)
-									{
-										LOGI(LOG_TAG,"Authenticate passed !!!!");
-									}
+								if(!isAuthenticate(Conn->getNonce(),tmpStr))
+									sendUnauthenticatedResponse(Conn,cseqNum);
+									
 							}					
 					}
 
@@ -295,19 +272,19 @@ void MyRTSPHandler::getDigest(const char* NONCE,const char* public_method,AStrin
 	char part3_md5[33];
 	char ret[33];
 	tmpStr.append(mMD5part1);
-	LOGI(LOG_TAG,"mMD5part1:%s",mMD5part1);
+	//LOGI(LOG_TAG,"mMD5part1:%s",mMD5part1);
 	tmpStr.append(":");
 	tmpStr.append(NONCE);
-	LOGI(LOG_TAG,"NONCE:%s",NONCE);
+	//LOGI(LOG_TAG,"NONCE:%s",NONCE);
 	tmpStr.append(":");
 	part3.append(public_method);
 	part3.append(":");
 	part3.append(mURI);
 	MD5_encode(part3.c_str(),part3_md5);
-	LOGI(LOG_TAG,"part3_md5:%s",part3_md5);
+	//LOGI(LOG_TAG,"part3_md5:%s",part3_md5);
 	
 	tmpStr.append(part3_md5);
-	LOGI(LOG_TAG,"[response]:%s",tmpStr.c_str());
+	//LOGI(LOG_TAG,"[response]:%s",tmpStr.c_str());
 	MD5_encode(tmpStr.c_str(),ret);
 	
 	result->setTo(ret);
@@ -374,6 +351,47 @@ int MyRTSPHandler::getHostIP(char addressBuffer[40])
 }
 #endif
 
+
+bool MyRTSPHandler::isAuthenticate(const char* NONCE,AString& tmpStr)
+{
+	AString Digest;
+	ssize_t resp;
+	resp = tmpStr.find("response");
+	
+	AString response(tmpStr, resp + 10, 32);
+	LOGI(LOG_TAG,"~~~Client's response %s",response.c_str());
+	getDigest(NONCE,"DESCRIBE",&Digest);
+	if(Digest==response)
+		{
+			LOGI(LOG_TAG,"Authenticate passed !!!!");
+			return true;
+		}
+	else return false;
+}
+
+void MyRTSPHandler::sendUnauthenticatedResponse(ARTSPConnection* Conn,int cseqNum)
+{
+	AString response;
+	uuid_t uuid;
+	char randomID[33];
+	uuid_generate(uuid);
+	sprintf(randomID,"%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x",
+		uuid[0],uuid[1],uuid[2],uuid[3],uuid[4],uuid[5],uuid[6],uuid[7],
+		uuid[8],uuid[9],uuid[10],uuid[11],uuid[12],uuid[13],uuid[14],uuid[15]);
+	Conn->setNonce(randomID);
+	response.append("RTSP/1.0 401 Unauthorized\r\n");
+	response.append("CSeq: ");
+	response.append(cseqNum);
+	response.append("\r\n");
+	response.append("WWW-Authenticate: Digest realm=\"");
+	response.append(realm);
+	response.append("\",nonce=\"");
+	response.append(randomID);
+	response.append("\"\r\n\r\n");
+	//LOGI(LOG_TAG,"%s",response.c_str());
+	Conn->sendResponse(response.c_str());
+
+}
 
 
 

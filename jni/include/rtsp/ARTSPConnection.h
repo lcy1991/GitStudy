@@ -87,6 +87,7 @@ struct ARTSPConnection : public AHandler {
 	void setNonce(const char * nonce);
 
 	const char* getNonce();
+	
     State mState;
     int32_t mSessionID;
 //	int mSocketAccept;

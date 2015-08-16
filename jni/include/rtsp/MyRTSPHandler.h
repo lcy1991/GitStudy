@@ -56,7 +56,9 @@ private:
 	char mMD5part1[33];
 	char mMD5part3[33];
 	AString mURI;
+	bool isAuthenticate(const char* NONCE,AString& tmpStr);
 
+	void sendUnauthenticatedResponse(ARTSPConnection* Conn,int cseqNum);	
 	
 };
 
