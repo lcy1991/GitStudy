@@ -400,6 +400,30 @@ void MyRTSPHandler::sendUnauthenticatedResponse(ARTSPConnection* Conn,int cseqNu
 	Conn->sendResponse(response.c_str());
 
 }
+/*
+SDP协议格式
+v=0
+o=- 1439819707757719 1 IN IP4 192.168.1.107
+s=H.264 Video, streamed by the LIVE555 Media Server
+i=test.264
+t=0 0
+a=tool:LIVE555 Streaming Media v2013.07.03
+a=type:broadcast
+a=control:*
+a=range:npt=0-
+a=x-qt-text-nam:H.264 Video, streamed by the LIVE555 Media Server
+a=x-qt-text-inf:test.264
+m=video 0 RTP/AVP 96
+c=IN IP4 0.0.0.0
+b=AS:500
+a=rtpmap:96 H264/90000
+a=fmtp:96 packetization-mode=1;profile-level-id=42001F;sprop-parameter-sets=Z0IAH5ZUBQHogAEABA==,aM44gAAAABBwYXNw
+a=control:track1
+profile-level-id 的值 是从SPS的第二个字节开始的三个字节
+sprop-parameter-sets SPS,PPS base64 编码
 
+
+
+*/
 
 
