@@ -32,6 +32,20 @@ struct ARTPConnection : public AHandler {
         kFakeTimestamps      = 1,
         kRegularlyRequestFIR = 2,
     };
+	
+	typedef struct RTPHeader
+	{
+		uint8_t v;	 //2bit
+		uint8_t p;	 //1bit
+		uint8_t x;	 //1bit
+		uint8_t cc;  //4bit
+		uint8_t m;	 //1bit
+		uint8_t pt;  //7bit
+		uint16_t seq;///16bit
+		uint32_t timestamp;//32bit
+		uint32_t ssrc;	   //32bit
+		
+	}RTPHeader;
 
     ARTPConnection(uint32_t flags = 0);
 
@@ -63,15 +77,19 @@ private:
         kWhatRemoveStream,
         kWhatPollStreams,
         kWhatInjectPacket,
+        kWhatSendPacket,
         kWhatFakeTimestamps,
     };
+	
 
     static const int64_t kSelectTimeoutUs;
 
     uint32_t mFlags;
-
+	uint32_t mTimestamp;//RTP timestamp
+	RTPHeader mRTPHeader;
     struct StreamInfo;
-    List<StreamInfo> mStreams;
+	StreamInfo mStreams;
+    //List<StreamInfo> mStreams;
 
     bool mPollEventPending;
     int64_t mLastReceiverReportTimeUs;

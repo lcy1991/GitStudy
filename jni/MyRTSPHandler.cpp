@@ -1,7 +1,7 @@
 #include "rtsp/MyRTSPHandler.h"
 #include "our_md5.h"
 #include "rtsp/uuid.h"
-
+#include "rtsp/base64.h"
 #include <arpa/inet.h>
 #include <fcntl.h>
 #include <unistd.h>
@@ -16,6 +16,10 @@ const char* passwd = "abc";
 const char* user = "abc";
 const char* realm = "android";
 const char* uri="/ch0/live";
+
+uint8_t spset[13] = {0x67 ,0x42, 0x00, 0x1f, 0x96, 0x54, 0x05, 0x01, 0xe8, 0x80 ,0x01, 0x00, 0x04};
+uint8_t ppset[12] = {0x68 ,0xce ,0x38 ,0x80 ,0x00 ,0x00 ,0x00 ,0x10 ,0x70 ,0x61 ,0x73 ,0x70  };
+
 //向服务器发送心跳包
 MyRTSPHandler::MyRTSPHandler()
 	: mRunningFlag(false),
@@ -116,7 +120,7 @@ void MyRTSPHandler::onReceiveRequest(const sp<AMessage> &msg)
 			{
 				ReqMethodNum = DESCRIBE;
 				msg->findString("URI",&URI);
-				LOGI(LOG_TAG,"findString Method %s CSeq %d URI:%s",method.c_str(),cseqNum,URI.c_str());
+				LOGI(LOG_TAG,"findString Method %s CSeq %d URI:%s###",method.c_str(),cseqNum,URI.c_str());
 				if(passwd!=""&&user!="")
 					{
 						if(msg->findString("Authorization",&tmpStr)==false)//no Authorization
@@ -125,9 +129,23 @@ void MyRTSPHandler::onReceiveRequest(const sp<AMessage> &msg)
 							}
 						else
 							{
-								if(!isAuthenticate(Conn->getNonce(),tmpStr))
+								if(!isAuthenticate(Conn->getNonce(),tmpStr,"DESCRIBE"))
 									sendUnauthenticatedResponse(Conn,cseqNum);
-									
+								else{
+								makeSDP(spset,13,ppset,12);
+								response.append("RTSP/1.0 200 OK\r\n");
+								response.append("CSeq: ");
+								response.append(cseqNum);
+								response.append("\r\nContent-Base: ");
+								response.append(mURI.c_str());
+								response.append("\r\nContent-Type: application/sdp\r\nContent-Length: ");
+								response.append(mSDP.size());
+								response.append("\r\n\r\n");
+								response.append(mSDP);
+								//LOGI(LOG_TAG,"%s",response.c_str());
+								Conn->sendResponse(response.c_str());	
+								mSDP.clear();
+								}
 							}					
 					}
 
@@ -149,11 +167,44 @@ void MyRTSPHandler::onReceiveRequest(const sp<AMessage> &msg)
 		if (strcmp(method.c_str(),"SETUP")==0)
 			{
 				ReqMethodNum = SETUP;
+				if(passwd!=""&&user!="")
+					{
+						if(msg->findString("Authorization",&tmpStr)==false)//no Authorization
+							{
+								sendUnauthenticatedResponse(Conn,cseqNum);
+							}
+						else
+							{
+								if(!isAuthenticate(Conn->getNonce(),tmpStr,"SETUP"))
+									sendUnauthenticatedResponse(Conn,cseqNum);
+								else
+									{
+										LOGI(LOG_TAG,"%s","setup Authenticate pass\n");
+									}
+							}					
+					}
+
 				break;
 			}
 		if (strcmp(method.c_str(),"PLAY")==0)
 			{
 				ReqMethodNum = PLAY;
+				if(passwd!=""&&user!="")
+					{
+						if(msg->findString("Authorization",&tmpStr)==false)//no Authorization
+							{
+								sendUnauthenticatedResponse(Conn,cseqNum);
+							}
+						else
+							{
+								if(!isAuthenticate(Conn->getNonce(),tmpStr,"PLAY"))
+									sendUnauthenticatedResponse(Conn,cseqNum);
+								else
+									{
+										LOGI(LOG_TAG,"%s","PLAY Authenticate pass\n");
+									}
+							}					
+					}				
 				break;
 			}
 		if (strcmp(method.c_str(),"PAUSE")==0)
@@ -228,10 +279,13 @@ void MyRTSPHandler::StartServer()
 		   //mSocketAccept需要锁保护
 		    //pthread_mutex_lock(&mMutex);
 		    LOGI(LOG_TAG,"rtsp Start accept\n");
-			mSocketAccept = accept(mSocket,NULL,NULL);
+		    struct sockaddr addr;
+            socklen_t addrlen ;
+			mSocketAccept = accept(mSocket,&addr,&addrlen);
 			mtempSessionID++;
 			
 			ARTSPConnection* rtspConn = new ARTSPConnection();
+			rtspConn->mClient_addr = addr;
 			mSessions.insert(make_pair(mtempSessionID, rtspConn));
 			mlooper.registerHandler(rtspConn);
 			rtspConn->StartListen(mSocketAccept,id(),mtempSessionID);
@@ -360,7 +414,7 @@ int MyRTSPHandler::getHostIP(char addressBuffer[40])
 #endif
 
 
-bool MyRTSPHandler::isAuthenticate(const char* NONCE,AString& tmpStr)
+bool MyRTSPHandler::isAuthenticate(const char* NONCE,AString& tmpStr,const char* method)
 {
 	AString Digest;
 	ssize_t resp;
@@ -368,7 +422,7 @@ bool MyRTSPHandler::isAuthenticate(const char* NONCE,AString& tmpStr)
 	
 	AString response(tmpStr, resp + 10, 32);
 	LOGI(LOG_TAG,"~~~Client's response %s",response.c_str());
-	getDigest(NONCE,"DESCRIBE",&Digest);
+	getDigest(NONCE,method,&Digest);
 	if(Digest==response)
 		{
 			LOGI(LOG_TAG,"Authenticate passed !!!!");
@@ -400,6 +454,40 @@ void MyRTSPHandler::sendUnauthenticatedResponse(ARTSPConnection* Conn,int cseqNu
 	Conn->sendResponse(response.c_str());
 
 }
+
+void MyRTSPHandler::makeSDP(uint8_t* SPS,uint32_t SPS_len,uint8_t* PPS,uint32_t PPS_len)
+{
+	char profile_level_id[7];
+	AString sps;
+	AString pps;
+    sprintf(profile_level_id,"%02X%02X%02X",SPS[1],SPS[2],SPS[3]);
+	encodeBase64(SPS,SPS_len,&sps);
+	encodeBase64(PPS,PPS_len,&pps);
+	mSDP.append("v=0\r\n");
+	mSDP.append("o=- 1439819707757719 1 IN IP4 192.168.1.107\r\n");
+	mSDP.append("s=H.264 Video, streamed by the android media Server\r\n");
+	mSDP.append("i=test.264\r\n");
+	mSDP.append("t=0 0\r\n"
+                "a=tool:android media Server 2015\r\n"
+				"a=type:broadcast\r\n"
+				"a=control:*\r\n"
+				"a=range:npt=0-\r\n"
+				"a=x-qt-text-nam:H.264 Video, streamed by the android media Server\r\n"
+				"a=x-qt-text-inf:test.264\r\n"
+				"m=video 0 RTP/AVP 96\r\n"
+				"c=IN IP4 0.0.0.0\r\n"
+				"b=AS:500\r\n"
+				"a=rtpmap:96 H264/90000\r\n"
+				"a=fmtp:96 packetization-mode=1;profile-level-id=");
+	mSDP.append(profile_level_id);
+	mSDP.append(";sprop-parameter-sets=");
+	mSDP.append(sps);
+	mSDP.append(",");
+	mSDP.append(pps);
+	mSDP.append("\r\n");
+	mSDP.append("a=control:track1\r\n");
+
+}
 /*
 SDP协议格式
 v=0
@@ -419,6 +507,7 @@ b=AS:500
 a=rtpmap:96 H264/90000
 a=fmtp:96 packetization-mode=1;profile-level-id=42001F;sprop-parameter-sets=Z0IAH5ZUBQHogAEABA==,aM44gAAAABBwYXNw
 a=control:track1
+                                                                                                                    Z0IgH5ZUBQHogAEgBA==,aM44gCAgIBBwYXNw
 profile-level-id 的值 是从SPS的第二个字节开始的三个字节
 sprop-parameter-sets SPS,PPS base64 编码
 

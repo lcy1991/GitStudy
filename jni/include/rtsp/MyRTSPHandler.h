@@ -35,6 +35,7 @@ struct MyRTSPHandler : public AHandler
 	MyRTSPHandler();
     virtual ~MyRTSPHandler();
 	int getHostIP (char addressBuffer[40]) ;
+	void makeSDP(uint8_t* SPS,uint32_t SPS_len,uint8_t* PPS,uint32_t PPS_len);
 	bool mRunningFlag;
 	map<uint32_t,ARTSPConnection*> mSessions;//<session_id,ARTSPConnection pointer>
 protected:
@@ -53,6 +54,7 @@ virtual void onMessageReceived(const sp<AMessage> &msg);
 	pthread_mutex_t mMutex;
 	pthread_t mtempTID;
 	int32_t mtempSessionID;
+	AString mSDP;
 private:
 	    enum {
         kwhatCloseSession   = 'clse',
@@ -60,7 +62,8 @@ private:
 	char mMD5part1[33];
 	char mMD5part3[33];
 	AString mURI;
-	bool isAuthenticate(const char* NONCE,AString& tmpStr);
+
+	bool isAuthenticate(const char* NONCE,AString& tmpStr,const char* method);
 
 	void sendUnauthenticatedResponse(ARTSPConnection* Conn,int cseqNum);	
 	

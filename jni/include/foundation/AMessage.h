@@ -22,6 +22,7 @@
 #include "foundation/ALooper.h"
 #include "foundation/LightRefBase.h"
 #include "foundation/StrongPointer.h"
+#include "foundation/ABuffer.h"
 
 #include <stdint.h>
 #include <sys/types.h>
@@ -47,7 +48,7 @@ struct AMessage :public LightRefBase<AMessage>{
     void setString(const char *name, const char *s, ssize_t len = -1);
 //    void setObject(const char *name, const sp<RefBase> &obj);
     void setMessage(const char *name, const sp<AMessage> &obj);
-
+    void setBuffer(const char *name, const sp<ABuffer> &obj);
     bool findInt32(const char *name, int32_t *value) const;
     bool findInt64(const char *name, int64_t *value) const;
     bool findSize(const char *name, size_t *value) const;
@@ -57,6 +58,7 @@ struct AMessage :public LightRefBase<AMessage>{
     bool findString(const char *name, AString *value) const;
 //    bool findObject(const char *name, sp<RefBase> *obj) const;
     bool findMessage(const char *name, sp<AMessage> *obj) const;
+	bool findBuffer(const char *name, sp<ABuffer> *obj) const;
 
     void post(int64_t delayUs = 0);
 
@@ -79,6 +81,7 @@ private:
         kTypeString,
         kTypeObject,
         kTypeMessage,
+        kTypeBuffer,
     };
 
     uint32_t mWhat;
@@ -94,6 +97,7 @@ private:
             void *ptrValue;
             AString *stringValue;
 			AMessage *msgValue;
+			ABuffer *bufValue;
         } u;
         const char *mName;
         Type mType;

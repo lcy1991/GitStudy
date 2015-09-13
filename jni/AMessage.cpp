@@ -169,6 +169,15 @@ void AMessage::setMessage(const char *name, const sp<AMessage> &obj) {
     item->u.msgValue = obj.get();
 }
 
+void AMessage::setBuffer(const char *name, const sp<ABuffer> &obj) {
+    Item *item = allocateItem(name);
+    item->mType = kTypeBuffer;
+
+    if (obj != NULL)
+    item->u.bufValue = obj.get();
+}
+
+
 bool AMessage::findString(const char *name, AString *value) const {
     const Item *item = findItem(name, kTypeString);
     if (item) {
@@ -191,6 +200,15 @@ bool AMessage::findMessage(const char *name,sp<AMessage> *obj) const {
     const Item *item = findItem(name, kTypeMessage);
     if (item) {
         *obj = static_cast<AMessage *>(item->u.msgValue);
+        return true;
+    }
+    return false;
+}
+
+bool AMessage::findBuffer(const char *name,sp<ABuffer> *obj) const {
+    const Item *item = findItem(name, kTypeBuffer);
+    if (item) {
+        *obj = static_cast<ABuffer *>(item->u.bufValue);
         return true;
     }
     return false;

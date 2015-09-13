@@ -94,9 +94,9 @@ struct ARTSPConnection : public AHandler {
 	
     State mState;
     int32_t mSessionID;
-//	int mSocketAccept;
     int mSocket;	
 	pthread_t mTID;
+	struct sockaddr mClient_addr;
 
 protected:
     
@@ -116,7 +116,6 @@ private:
     AString mUser, mPass;
     AuthType mAuthType;
     AString mNonce;
-
 	handler_id mhandlerID;// request msg target
 	bool mReceiveRequestEventPending;
 

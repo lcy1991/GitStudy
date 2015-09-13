@@ -447,7 +447,7 @@ bool ARTSPConnection::receiveRTSPRequest() {
 
     AString Method(requestLine.c_str(), space1);
 	request->setString("Method",Method.c_str());
-	AString URI(requestLine,space1+1,space2-space1);
+	AString URI(requestLine,space1+1,space2-space1-1);
 	request->setString("URI",URI.c_str());
     AString line;
     for (;;) {
