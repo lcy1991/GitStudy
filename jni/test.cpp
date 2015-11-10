@@ -4,12 +4,46 @@
 #include <unistd.h>
 #include "foundation/ADebug.h"
 #include "rtsp/MyRTSPHandler.h"
+#include "rtsp/ARTPSource.h"
 
 
+ARTPSource mysource(5,20); 
 
 
+void* sendbuf(void* agr)
+{
+	int i;
+	sp<ABuffer> buf;
+	char neirong[20];
+	for(i=0;i<100;i++)
+		{
+			sprintf(neirong,"neirong %d",i);
+			mysource.inputQPop(buf);
+			memcpy(buf->data(),neirong,strlen(neirong));
+			buf->setRange(0,strlen(neirong));
+			mysource.inputQPush(buf);
+		}
+}
+
+void* getbuf(void* arg)
+{
+	int i;
+	sp<ABuffer> buf;
+	char neirong[20];
+	for(i=0;i<100;i++)
+		{
+			//sprintf(neirong,"neirong %d",i);
+			mysource.outputQPop(buf);
+			memcpy(neirong,buf->data(),buf->size());
+			printf("%s\n",buf->data());
+			buf->setRange(0,0);
+			mysource.outputQPush(buf);
+		}	
+}
 int main()
 {
+	printf("abc\n");
+#if 0
 	uint32_t i;
 	char* tmp = "1234567890\r\n1234567";
 	handler_1* handler1 = new handler_1();
@@ -41,10 +75,21 @@ int main()
 
 	MyRTSPHandler handler_rtsp;
 	handler_rtsp.StartServer();
-	
+#else
+
+pthread_t idsend;
+pthread_t idget;
+
+int i,ret;
+ret=pthread_create(&idget,NULL,getbuf,NULL);
+
+ret=pthread_create(&idsend,NULL,sendbuf,NULL);
+//sleep(1);
 
 
-	
+
+#endif
+
 	return 0;
 }
 

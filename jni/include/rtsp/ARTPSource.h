@@ -1,6 +1,7 @@
 #include <queue>
 #include "foundation/ABuffer.h"
 #include "foundation/Mutex.h"
+#include "foundation/ADebug.h"
 
 using namespace std;
 struct MyQueue
