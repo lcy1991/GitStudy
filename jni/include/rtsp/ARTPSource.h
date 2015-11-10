@@ -24,9 +24,9 @@ struct ARTPSource
 {
 	ARTPSource(uint32_t bufNum, uint32_t bufSize);
 	~ARTPSource();
-	int inputQPop(const sp<ABuffer> &buf);
+	int inputQPop(sp<ABuffer> &buf);
 	int inputQPush(const sp<ABuffer> &buf);
-	int outputQPop(const sp<ABuffer> &buf);
+	int outputQPop(sp<ABuffer> &buf);
 	int outputQPush(const sp<ABuffer> &buf);
 	
 private:

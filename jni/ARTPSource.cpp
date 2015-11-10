@@ -36,7 +36,7 @@ int MyQueue::getEmptyBufSize()
 	return mEmptyBufSize;
 }
 
-int ARTPSource::inputQPop(const sp<ABuffer> &buf)
+int ARTPSource::inputQPop(sp<ABuffer> &buf)
 {
 	mInputQLock.lock();
 	if(pInInputQ->getEmptyBufSize()==0)
@@ -59,7 +59,7 @@ int ARTPSource::inputQPush(const sp<ABuffer> &buf)
 	mInputQLock.unlock();
 	return 0;
 }
-int ARTPSource::outputQPop(const sp<ABuffer> &buf)
+int ARTPSource::outputQPop(sp<ABuffer> &buf)
 {
 	if(pOutOutputQ->getEmptyBufSize() == pOutOutputQ->getQSize())
 		{
