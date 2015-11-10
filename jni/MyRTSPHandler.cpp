@@ -180,6 +180,23 @@ void MyRTSPHandler::onReceiveRequest(const sp<AMessage> &msg)
 								else
 									{
 										LOGI(LOG_TAG,"%s","setup Authenticate pass\n");
+										//find client rtp/rtcp port 
+										//Transport: RTP/AVP;unicast;client_port=4588-4589\r\n									\r\n
+										AString Transport;
+										uint8_t fstConlon;
+										uint8_t sndConlon;
+										uint8_t part1;// =
+										uint8_t part2;// -
+										if(msg->findString("Transport",&Transport))
+											{
+												fstConlon = Transport.find(";",9);
+												sndConlon = Transport.find(";",fstConlon+1);
+												part1 = Transport.find("=");
+												part2 = Transport.find("-",part1+1);
+												AString rtpPort(Transport,part1+1,part2-part1-1);
+												
+											}
+										else break;
 									}
 							}					
 					}
@@ -200,8 +217,16 @@ void MyRTSPHandler::onReceiveRequest(const sp<AMessage> &msg)
 								if(!isAuthenticate(Conn->getNonce(),tmpStr,"PLAY"))
 									sendUnauthenticatedResponse(Conn,cseqNum);
 								else
-									{
+									{/*
 										LOGI(LOG_TAG,"%s","PLAY Authenticate pass\n");
+										//Transport:RTP/AVP;unicast;client_port=62418-62419
+										int rtpsocket;
+										struct sockaddr_in ser_addr;
+										ser_addr = (sockaddr_in)Conn->mClient_addr;
+									    //memset(&ser_addr, 0, sizeof(ser_addr));  
+									    ser_addr.sin_family = AF_INET;   
+									    ser_addr.sin_port = htons(SERVER_PORT);  
+									    sock_fd = socket(AF_INET, SOCK_STREAM, 0);  */
 									}
 							}					
 					}				

@@ -32,7 +32,6 @@
 #include <arpa/inet.h>
 #include <sys/socket.h>
 
-namespace android {
 
 const uint8_t ff_ue_golomb_vlc_code[512]=
 { 32,32,32,32,32,32,32,32,31,32,32,32,32,32,32,32,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,
@@ -123,9 +122,11 @@ static void bumpSocketBufferSize(int s) {
     CHECK_EQ(setsockopt(s, SOL_SOCKET, SO_RCVBUF, &size, sizeof(size)), 0);
 }
 
+
 // static
-void ARTPConnection::MakePortPair(
-        int *rtpSocket, int *rtcpSocket, unsigned *rtpPort) {
+/**/
+unsigned ARTPConnection::MakePortPair(
+        int *rtpSocket, int *rtcpSocket, struct sockaddr_in addr) {
     *rtpSocket = socket(AF_INET, SOCK_DGRAM, 0);
     CHECK_GE(*rtpSocket, 0);
 
@@ -140,11 +141,11 @@ void ARTPConnection::MakePortPair(
     start &= ~1;
 
     for (unsigned port = start; port < 65536; port += 2) {
-        struct sockaddr_in addr;
-        memset(addr.sin_zero, 0, sizeof(addr.sin_zero));
-        addr.sin_family = AF_INET;
-        addr.sin_addr.s_addr = INADDR_ANY;
-        addr.sin_port = htons(port);
+//        struct sockaddr_in addr;
+//        memset(addr.sin_zero, 0, sizeof(addr.sin_zero));
+//        addr.sin_family = AF_INET;
+//        addr.sin_addr.s_addr = INADDR_ANY;
+		addr.sin_port = htons(port);
 
         if (bind(*rtpSocket,
                  (const struct sockaddr *)&addr, sizeof(addr)) < 0) {
@@ -156,11 +157,28 @@ void ARTPConnection::MakePortPair(
         if (bind(*rtcpSocket,
                  (const struct sockaddr *)&addr, sizeof(addr)) == 0) {
             *rtpPort = port;
-            return;
+            break;//return port;
         }
     }
 
-    TRESPASS();
+	addr.sin_port = htons(port);
+	if (connect(*rtpSocket,(const struct sockaddr *)&addr, sizeof(addr)) < 0) {
+		LOGE(LOG_TAG,"rtpSocket connect to client failed!");
+		return -1;
+	}
+	
+	addr.sin_port = htons(port + 1);
+	if (connect(*rtcpSocket,(const struct sockaddr *)&addr, sizeof(addr)) < 0) {
+		LOGE(LOG_TAG,"rtcpSocket connect to client failed!");
+		return -1;
+	}
+	return port;
+
+}
+
+void startSendPacket()
+{
+	
 }
 
 void ARTPConnection::onMessageReceived(const sp<AMessage> &msg) {
@@ -557,5 +575,4 @@ void ARTPConnection::onFakeTimestamps() {
     }
 }
 
-}  // namespace android
 

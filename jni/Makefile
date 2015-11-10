@@ -13,7 +13,8 @@ OBJ=                   \
 	our_md5.o          \
 	AAtomizer.o        \
 	ARTSPConnection.o  \
-	MyRTSPHandler.o
+	MyRTSPHandler.o    \
+	ARTPSource.o
 
 
 CC=g++

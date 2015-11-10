@@ -22,6 +22,8 @@
 #include "foundation/AString.h"
 #include "foundation/LightRefBase.h"
 #include "foundation/StrongPointer.h"
+#include <sys/socket.h>
+//#include "rtsp/ARTPConnection.h"
 
 #include <map>
 #include <pthread.h>
@@ -97,6 +99,7 @@ struct ARTSPConnection : public AHandler {
     int mSocket;	
 	pthread_t mTID;
 	struct sockaddr mClient_addr;
+//	ARTPConnection mRTPConn;
 
 protected:
     
@@ -108,6 +111,7 @@ private:
         BASIC,
         DIGEST
     };
+//	ARTPConnection RTPConn;
 
     static const int64_t kSelectTimeoutUs;
 

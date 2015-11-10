@@ -125,7 +125,7 @@ bool AString::operator==(const AString &other) const {
     return mSize == other.mSize && !memcmp(mData, other.mData, mSize);
 }
 
-void AString::trim() {
+void AString::trim() {//remove space at front and back
     makeMutable();
 
     size_t i = 0;
@@ -297,7 +297,7 @@ int AString::compare(const AString &other) const {
     return strcmp(mData, other.mData);
 }
 
-void AString::tolower() {
+void AString::tolower() {// 把字符转换成小写字母,非字母字符不做出处理
     makeMutable();
 
     for (size_t i = 0; i < mSize; ++i) {

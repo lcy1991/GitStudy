@@ -18,10 +18,9 @@
 
 #define A_RTP_CONNECTION_H_
 
-#include <media/stagefright/foundation/AHandler.h>
-#include <utils/List.h>
+#include "foundation/AHandler.h"
+//#include <utils/List.h>
 
-namespace android {
 
 struct ABuffer;
 struct ARTPSource;
@@ -83,7 +82,7 @@ private:
 	
 
     static const int64_t kSelectTimeoutUs;
-
+	uint32_t mRtpPort;
     uint32_t mFlags;
 	uint32_t mTimestamp;//RTP timestamp
 	RTPHeader mRTPHeader;
@@ -115,6 +114,6 @@ private:
     DISALLOW_EVIL_CONSTRUCTORS(ARTPConnection);
 };
 
-}  // namespace android
+
 
 #endif  // A_RTP_CONNECTION_H_
