@@ -7,7 +7,11 @@ MyQueue::MyQueue()
 MyQueue::~MyQueue()
 {
 	while(mBufQue.size())
-		mBufQue.pop();
+		{
+			mBufQue.pop();
+			//LOGI(LOG_TAG,"~MyQueue");
+		}
+		
 }
 
 
@@ -37,17 +41,18 @@ int MyQueue::getEmptyBufSize()
 	return mEmptyBufSize;
 }
 
+
 int ARTPSource::inputQPop(sp<ABuffer> &buf)
 {
 	mInputQLock.lock();
 	LOGI(LOG_TAG,"mInputQ is Lock");
-	if(pInInputQ->getEmptyBufSize()==0)
+	if(pInInputQ->getEmptyBufSize()==0)//input queue is full, we need empty queue
 		{
 			LOGI(LOG_TAG,"inputQPop input queue is full,waiting for exchange");
 			mInputQLock.unlock();
 			LOGI(LOG_TAG,"mInputQ is unLock");
-			mOutputQLock.lock();//trylock
-			if(pOutOutputQ->getEmptyBufSize()!=0)
+			mOutputQLock.lock();//get the output queue
+			if(pOutOutputQ->getEmptyBufSize()!=0)//if output queue is not empty, don't change
 				{
 					mOutputQLock.unlock();
 					return -1;
@@ -79,7 +84,7 @@ int ARTPSource::outputQPop(sp<ABuffer> &buf)
 
 	mOutputQLock.lock();
 
-	if(pOutOutputQ->getEmptyBufSize() == pOutOutputQ->getQSize())
+	if(pOutOutputQ->getEmptyBufSize() == pOutOutputQ->getQSize())//queue is empty
 		{
 			
 			LOGI(LOG_TAG,"output queue is empty ,waiting for exchange");
@@ -87,7 +92,7 @@ int ARTPSource::outputQPop(sp<ABuffer> &buf)
 			LOGI(LOG_TAG,"mOutputQ is unlock");
 			mInputQLock.lock();
 			LOGI(LOG_TAG,"mInputQ is lock");
-			if(pInInputQ->getEmptyBufSize()!=0)
+			if(pInInputQ->getEmptyBufSize()!=0)//intput queue is not empty, we change in and out
 				{
 					mInputQLock.unlock();
 					LOGI(LOG_TAG,"mInputQ is unlock");
@@ -99,6 +104,11 @@ int ARTPSource::outputQPop(sp<ABuffer> &buf)
 			pOutOutputQ = (pOutOutputQ == &mOutputQueue)?&mInputQueue:&mOutputQueue;
 			pInInputQ = (pInInputQ == &mInputQueue)?&mOutputQueue:&mInputQueue;
 			pOutOutputQ->pop(buf);
+			if(buf->size()==0)//buf is empty
+				{
+					pOutOutputQ->push(buf);
+					return -1;
+				}			
 			mInputQLock.unlock();
 			LOGI(LOG_TAG,"mInputQ is unlock +++++++++++++++++++++++++++");
 		}
@@ -106,6 +116,11 @@ int ARTPSource::outputQPop(sp<ABuffer> &buf)
 		{
 			LOGI(LOG_TAG,"pop from output queue %d",pOutOutputQ);
 			pOutOutputQ->pop(buf);
+			if(buf->size()==0)//ABuffer is empty
+				{
+					pOutOutputQ->push(buf);
+					return -1;
+				}
 		}
 	return 0;
 }

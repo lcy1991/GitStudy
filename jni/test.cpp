@@ -33,17 +33,18 @@ void* getbuf(void* arg)
 	int i;
 	sp<ABuffer> buf;
 	char neirong[20];
-	for(i=0;i<100;i++)
+	for(i=0;i<200;i++)
 		{
 			//sprintf(neirong,"neirong %d",i);
 			if(mysource.outputQPop(buf)>=0)
 				{
-					if(buf->size()==0)
+			/*		if(buf->size()==0)
 						{
 							buf->setRange(0,0);
 							mysource.outputQPush(buf);
 							continue;
 						}
+			*/			
 					memcpy(neirong,buf->data(),buf->size());
 					printf("%s\n",neirong);
 					buf->setRange(0,0);
