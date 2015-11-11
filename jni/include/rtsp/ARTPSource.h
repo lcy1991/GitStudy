@@ -33,6 +33,7 @@ struct ARTPSource
 private:
 	uint32_t mBufSize;
 	uint32_t mBufNum;
+	int mFirstOutputPop;
 	MyQueue mInputQueue;
 	MyQueue mOutputQueue;
 	MyQueue* pInInputQ;

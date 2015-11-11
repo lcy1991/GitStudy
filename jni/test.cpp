@@ -18,10 +18,13 @@ void* sendbuf(void* agr)
 	for(i=0;i<100;i++)
 		{
 			sprintf(neirong,"neirong %d",i);
-			mysource.inputQPop(buf);
-			memcpy(buf->data(),neirong,strlen(neirong));
-			buf->setRange(0,strlen(neirong));
-			mysource.inputQPush(buf);
+			if(mysource.inputQPop(buf)>=0)
+				{
+					memcpy(buf->data(),neirong,strlen(neirong));
+					buf->setRange(0,strlen(neirong));
+					mysource.inputQPush(buf);				
+				}
+			else i--;
 		}
 }
 
@@ -33,11 +36,19 @@ void* getbuf(void* arg)
 	for(i=0;i<100;i++)
 		{
 			//sprintf(neirong,"neirong %d",i);
-			mysource.outputQPop(buf);
-			memcpy(neirong,buf->data(),buf->size());
-			printf("%s\n",buf->data());
-			buf->setRange(0,0);
-			mysource.outputQPush(buf);
+			if(mysource.outputQPop(buf)>=0)
+				{
+					if(buf->size()==0)
+						{
+							buf->setRange(0,0);
+							mysource.outputQPush(buf);
+							continue;
+						}
+					memcpy(neirong,buf->data(),buf->size());
+					printf("%s\n",neirong);
+					buf->setRange(0,0);
+					mysource.outputQPush(buf);
+				}
 		}	
 }
 int main()
@@ -81,10 +92,16 @@ pthread_t idsend;
 pthread_t idget;
 
 int i,ret;
-ret=pthread_create(&idget,NULL,getbuf,NULL);
+
 
 ret=pthread_create(&idsend,NULL,sendbuf,NULL);
+
+ret=pthread_create(&idget,NULL,getbuf,NULL);
+
 //sleep(1);
+void* status;
+pthread_join(idsend,&status);
+pthread_join(idget,&status);
 
 
 
