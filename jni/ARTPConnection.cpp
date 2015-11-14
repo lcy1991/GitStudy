@@ -16,18 +16,18 @@
 
 //#define LOG_NDEBUG 0
 #define LOG_TAG "ARTPConnection"
-#include <utils/Log.h>
 
-#include "ARTPConnection.h"
 
-#include "ARTPSource.h"
-#include "ASessionDescription.h"
+#include "rtsp/ARTPConnection.h"
 
-#include <media/stagefright/foundation/ABuffer.h>
-#include <media/stagefright/foundation/ADebug.h>
-#include <media/stagefright/foundation/AMessage.h>
-#include <media/stagefright/foundation/AString.h>
-#include <media/stagefright/foundation/hexdump.h>
+#include "rtsp/ARTPSource.h"
+//#include "ASessionDescription.h"
+
+#include <foundation/ABuffer.h>
+#include <foundation/ADebug.h>
+#include <foundation/AMessage.h>
+#include <foundation/AString.h>
+
 
 #include <arpa/inet.h>
 #include <sys/socket.h>
@@ -77,9 +77,6 @@ struct ARTPConnection::StreamInfo {
     size_t mIndex;
     sp<AMessage> mNotifyMsg;
 //    KeyedVector<uint32_t, sp<ARTPSource> > mSources;
-
-    int64_t mNumRTCPPacketsReceived;
-    int64_t mNumRTPPacketsReceived;
     struct sockaddr_in mRemoteRTCPAddr;
 
 //    bool mIsInjected;
@@ -96,14 +93,12 @@ ARTPConnection::~ARTPConnection() {
 
 void ARTPConnection::addStream(
         int rtpSocket, int rtcpSocket,
-        const sp<ASessionDescription> &sessionDesc,
         size_t index,
         const sp<AMessage> &notify,
         bool injected) {
     sp<AMessage> msg = new AMessage(kWhatAddStream, id());
     msg->setInt32("rtp-socket", rtpSocket);
     msg->setInt32("rtcp-socket", rtcpSocket);
-    msg->setObject("session-desc", sessionDesc);
     msg->setSize("index", index);
     msg->setMessage("notify", notify);
     msg->setInt32("injected", injected);
@@ -172,7 +167,7 @@ unsigned ARTPConnection::MakePortPair(
 		LOGE(LOG_TAG,"rtcpSocket connect to client failed!");
 		return -1;
 	}
-	return port;
+	return port;// return rtp port and rtcp port
 
 }
 
@@ -243,8 +238,6 @@ void ARTPConnection::onAddStream(const sp<AMessage> &msg) {
     CHECK(msg->findSize("index", &mStreams.mIndex));
     CHECK(msg->findMessage("notify", &mStreams.mNotifyMsg));
 
-    mStreams.mNumRTCPPacketsReceived = 0;
-    mStreams.mNumRTPPacketsReceived = 0;
     memset(&mStreams.mRemoteRTCPAddr, 0, sizeof(mStreams.mRemoteRTCPAddr));
 
 
@@ -299,34 +292,7 @@ void ARTPConnection::makeRTPHeader(RTPHeader* h,uint8_t out[12])
 nal < MUT 1460
 nal > MUT
 
-
 */
-int ARTPConnection::parseRTP(const sp<ABuffer> &buf) {
-	uint8_t header[12];
-	ssize_t nbytes;
-	uint8_t* data = buf->data();
-	if(buf->offset()!=12)return -1;
-	if(isFirstNalu(data,buf->size()))
-		{
-			mRTPHeader.timestamp  += 300;
-		}
-	mRTPHeader.seq += 1;
-	if(buf->size() < 1460)
-		{
-			makeRTPHeader(&mRTPHeader,header);
-			memcpy(buf->base(),header,12);
-			nbytes = send(
-            mStreams.mRTPSocket,
-            buf->base(),
-            buf->capacity(),
-            0,);
-		}
-
-	
-	
-
-	
-}
 
 bool ARTPConnection::isFirstNalu(uint8_t* data,size_t length) {
 
@@ -373,206 +339,171 @@ status_t ARTPConnection::sendRTP(StreamInfo *s,const sp<ABuffer> &buffer) {
 }
 
 
-status_t ARTPConnection::parseRTCP(StreamInfo *s, const sp<ABuffer> &buffer) {
-    if (s->mNumRTCPPacketsReceived++ == 0) {
-        sp<AMessage> notify = s->mNotifyMsg->dup();
-        notify->setInt32("first-rtcp", true);
-        notify->post();
-    }
 
-    const uint8_t *data = buffer->data();
-    size_t size = buffer->size();
-
-    while (size > 0) {
-        if (size < 8) {
-            // Too short to be a valid RTCP header
-            return -1;
-        }
-
-        if ((data[0] >> 6) != 2) {
-            // Unsupported version.
-            return -1;
-        }
-
-        if (data[0] & 0x20) {
-            // Padding present.
-
-            size_t paddingLength = data[size - 1];
-
-            if (paddingLength + 12 > size) {
-                // If we removed this much padding we'd end up with something
-                // that's too short to be a valid RTP header.
-                return -1;
-            }
-
-            size -= paddingLength;
-        }
-
-        size_t headerLength = 4 * (data[2] << 8 | data[3]) + 4;
-
-        if (size < headerLength) {
-            // Only received a partial packet?
-            return -1;
-        }
-
-        switch (data[1]) {
-            case 200:
-            {
-                parseSR(s, data, headerLength);
-                break;
-            }
-
-            case 201:  // RR
-            case 202:  // SDES
-            case 204:  // APP
-                break;
-
-            case 205:  // TSFB (transport layer specific feedback)
-            case 206:  // PSFB (payload specific feedback)
-                // hexdump(data, headerLength);
-                break;
-
-            case 203:
-            {
-                parseBYE(s, data, headerLength);
-                break;
-            }
-
-            default:
-            {
-                LOGW("Unknown RTCP packet type %u of size %d",
-                     (unsigned)data[1], headerLength);
-                break;
-            }
-        }
-
-        data += headerLength;
-        size -= headerLength;
-    }
-
-    return OK;
+void ARTPConnection::setSource(ARTPSource* src)
+{
+	mRTPSource = src;
 }
 
-status_t ARTPConnection::parseBYE(
-        StreamInfo *s, const uint8_t *data, size_t size) {
-    size_t SC = data[0] & 0x3f;
+status_t ARTPConnection::RTPPacket(sp<ABuffer> buf)
+{
+	static uint32_t timeStamp = 0;
+	static uint16_t seqNum;
+	uint32_t bytes;
+	//static sp<ABuffer> preBuf = new ABuffer(MTU_SIZE);
+	//sp<ABuffer> swapBuf;
+	char* nalu_payload;
+	//RTP header 12 bytes
+	if(isFirstNalu(buf->data(),buf->size()))
+		timeStamp+=(unsigned int)(90000.0 / mRTPSource->mFramerate);
+	NALU_t nalu;
 
-    if (SC == 0 || size < (4 + SC * 4)) {
-        // Packet too short for the minimal BYE header.
-        return -1;
-    }
+while(1) 
+{
+	memset(&nalu,0,sizeof(NALU_t));
+	GetAnnexbNALU(&nalu,buf);//每执行一次，文件的指针指向本次找到的NALU的末尾，下一个位置即为下个NALU的起始码0x000001
+	dump(&nalu);//输出NALU长度和TYPE
 
-    uint32_t id = u32at(&data[4]);
+	//memset(sendbuf,0,1500);//清空sendbuf；此时会将上次的时间戳清空，因此需要ts_current来保存上次的时间戳值
 
-    sp<ARTPSource> source = findSource(s, id);
+	//rtp固定包头，为12字节,该句将sendbuf[0]的地址赋给rtp_hdr，以后对rtp_hdr的写入操作将直接写入sendbuf。
+	rtp_hdr =(RTP_FIXED_HEADER*)&sendbuf[0]; 
+	
+	//设置RTP HEADER，
+	rtp_hdr->version = 2;	//版本号，此版本固定为2
+	rtp_hdr->marker  = 0;	//标志位，由具体协议规定其值。
+	rtp_hdr->payload = 96;//H264;//负载类型号，
+	rtp_hdr->ssrc	 = htonl(10);//随机指定为10，并且在本RTP会话中全局唯一
 
-    source->byeReceived();
+	//当一个NALU小于1400字节的时候，采用一个单RTP包发送
+	if(nalu.len <= UDP_MAX_SIZE){
+		//设置rtp M 位；
+		rtp_hdr->marker=1;
+		rtp_hdr->seq_no = htons(seqNum ++); //序列号，每发送一个RTP包增1
+		rtp_hdr->timestamp=htonl(timeStamp);
+		//设置NALU HEADER,并将这个HEADER填入sendbuf[12]
+		nalu_hdr =(NALU_HEADER*)&sendbuf[12]; //将sendbuf[12]的地址赋给nalu_hdr，之后对nalu_hdr的写入就将写入sendbuf中；
+		nalu_hdr->F=nalu.forbidden_bit;
+		nalu_hdr->NRI=nalu.nal_reference_idc>>5;//有效数据在n->nal_reference_idc的第6，7位，需要右移5位才能将其值赋给nalu_hdr->NRI。
+		nalu_hdr->TYPE=nalu.nal_unit_type;
 
-    return OK;
+		nalu_payload=&sendbuf[13];//同理将sendbuf[13]赋给nalu_payload
+		memcpy(nalu_payload,nalu.buf+1,nalu.len-1);//去掉nalu头的nalu剩余内容写入sendbuf[13]开始的字符串。
+
+		//timeStamp = timeStamp + timestamp_increse;
+		
+		bytes = nalu.len + 12 ; //获得sendbuf的长度,为nalu的长度（包含NALU头但除去起始前缀）加上rtp_header的固定长度12字节
+		//send(socket1,sendbuf,bytes,0);//发送RTP包
+		//Sleep(100);
+	}else{
+		int packetNum = nalu.len/UDP_MAX_SIZE;
+		if (n->len%UDP_MAX_SIZE != 0)
+			packetNum ++;
+
+		int lastPackSize = nalu.len - (packetNum-1)*UDP_MAX_SIZE;
+		int packetIndex = 1 ;
+
+		//timeStamp = timeStamp + timestamp_increse;
+
+		rtp_hdr->timestamp = htonl(timeStamp);
+
+		//发送第一个的FU，S=1，E=0，R=0
+
+		rtp_hdr->seq_no = htons(seqNum++); //序列号，每发送一个RTP包增1
+		//设置rtp M 位；
+		rtp_hdr->marker=0;
+		//设置FU INDICATOR,并将这个HEADER填入sendbuf[12]
+		fu_ind =(FU_INDICATOR*)&sendbuf[12]; //将sendbuf[12]的地址赋给fu_ind，之后对fu_ind的写入就将写入sendbuf中；
+		fu_ind->F=nalu.forbidden_bit;
+		fu_ind->NRI=nalu.nal_reference_idc>>5;
+		fu_ind->TYPE=28;
+
+		//设置FU HEADER,并将这个HEADER填入sendbuf[13]
+		fu_hdr =(FU_HEADER*)&sendbuf[13];
+		fu_hdr->S=1;
+		fu_hdr->E=0;
+		fu_hdr->R=0;
+		fu_hdr->TYPE=nalu.nal_unit_type;
+
+		nalu_payload=&sendbuf[14];//同理将sendbuf[14]赋给nalu_payload
+		memcpy(nalu_payload,nalu.buf+1,UDP_MAX_SIZE);//去掉NALU头
+		bytes=UDP_MAX_SIZE+14;//获得sendbuf的长度,为nalu的长度（除去起始前缀和NALU头）加上rtp_header，fu_ind，fu_hdr的固定长度14字节
+		//send( socket1, sendbuf, bytes, 0 );//发送RTP包
+
+		//发送中间的FU，S=0，E=0，R=0
+		for(packetIndex=2;packetIndex<packetNum;packetIndex++)
+		{
+			rtp_hdr->seq_no = htons(seqNum++); //序列号，每发送一个RTP包增1
+	 
+			//设置rtp M 位；
+			rtp_hdr->marker=0;
+			//设置FU INDICATOR,并将这个HEADER填入sendbuf[12]
+			fu_ind =(FU_INDICATOR*)&sendbuf[12]; //将sendbuf[12]的地址赋给fu_ind，之后对fu_ind的写入就将写入sendbuf中；
+			fu_ind->F=nalu.forbidden_bit;
+			fu_ind->NRI=nalu.nal_reference_idc>>5;
+			fu_ind->TYPE=28;
+
+			//设置FU HEADER,并将这个HEADER填入sendbuf[13]
+			fu_hdr =(FU_HEADER*)&sendbuf[13];
+			fu_hdr->S=0;
+			fu_hdr->E=0;
+			fu_hdr->R=0;
+			fu_hdr->TYPE=nalu.nal_unit_type;
+
+			nalu_payload=&sendbuf[14];//同理将sendbuf[14]的地址赋给nalu_payload
+			memcpy(nalu_payload,nalu.buf+(packetIndex-1)*UDP_MAX_SIZE+1,UDP_MAX_SIZE);//去掉起始前缀的nalu剩余内容写入sendbuf[14]开始的字符串。
+			bytes=UDP_MAX_SIZE+14;//获得sendbuf的长度,为nalu的长度（除去原NALU头）加上rtp_header，fu_ind，fu_hdr的固定长度14字节
+			//send( socket1, sendbuf, bytes, 0 );//发送rtp包				
+		}
+
+		//发送最后一个的FU，S=0，E=1，R=0
+	
+		rtp_hdr->seq_no = htons(seqNum ++);
+		//设置rtp M 位；当前传输的是最后一个分片时该位置1		
+		rtp_hdr->marker=1;
+		//设置FU INDICATOR,并将这个HEADER填入sendbuf[12]
+		fu_ind =(FU_INDICATOR*)&sendbuf[12]; //将sendbuf[12]的地址赋给fu_ind，之后对fu_ind的写入就将写入sendbuf中；
+		fu_ind->F=nalu.forbidden_bit;
+		fu_ind->NRI=nalu.nal_reference_idc>>5;
+		fu_ind->TYPE=28;
+
+		//设置FU HEADER,并将这个HEADER填入sendbuf[13]
+		fu_hdr =(FU_HEADER*)&sendbuf[13];
+		fu_hdr->S=0;
+		fu_hdr->E=1;
+		fu_hdr->R=0;
+		fu_hdr->TYPE=nalu.nal_unit_type;
+
+		nalu_payload=&sendbuf[14];//同理将sendbuf[14]的地址赋给nalu_payload
+		memcpy(nalu_payload,nalu.buf+(packetIndex-1)*UDP_MAX_SIZE+1,lastPackSize-1);//将nalu最后剩余的-1(去掉了一个字节的NALU头)字节内容写入sendbuf[14]开始的字符串。
+		bytes=lastPackSize-1+14;//获得sendbuf的长度,为剩余nalu的长度l-1加上rtp_header，FU_INDICATOR,FU_HEADER三个包头共14字节
+		//send( socket1, sendbuf, bytes, 0 );//发送rtp包		
+	}
+
 }
 
-status_t ARTPConnection::parseSR(
-        StreamInfo *s, const uint8_t *data, size_t size) {
-    size_t RC = data[0] & 0x1f;
-
-    if (size < (7 + RC * 6) * 4) {
-        // Packet too short for the minimal SR header.
-        return -1;
-    }
-
-    uint32_t id = u32at(&data[4]);
-    uint64_t ntpTime = u64at(&data[8]);
-    uint32_t rtpTime = u32at(&data[16]);
-
-#if 0
-    LOGI("XXX timeUpdate: ssrc=0x%08x, rtpTime %u == ntpTime %.3f",
-         id,
-         rtpTime,
-         (ntpTime >> 32) + (double)(ntpTime & 0xffffffff) / (1ll << 32));
-#endif
-
-    sp<ARTPSource> source = findSource(s, id);
-
-    if ((mFlags & kFakeTimestamps) == 0) {
-        source->timeUpdate(rtpTime, ntpTime);
-    }
-
-    return 0;
 }
 
-sp<ARTPSource> ARTPConnection::findSource(StreamInfo *info, uint32_t srcId) {
-    sp<ARTPSource> source;
-    ssize_t index = info->mSources.indexOfKey(srcId);
-    if (index < 0) {
-        index = info->mSources.size();
+void ARTPConnection::sendRTPPacket()
+{
 
-        source = new ARTPSource(
-                srcId, info->mSessionDesc, info->mIndex, info->mNotifyMsg);
-
-        info->mSources.add(srcId, source);
-    } else {
-        source = info->mSources.valueAt(index);
-    }
-
-    return source;
 }
 
-void ARTPConnection::injectPacket(int index, const sp<ABuffer> &buffer) {
-    sp<AMessage> msg = new AMessage(kWhatInjectPacket, id());
-    msg->setInt32("index", index);
-    msg->setObject("buffer", buffer);
-    msg->post();
+
+
+int ARTPConnection::GetAnnexbNALU (NALU_t *nalu,const sp<ABuffer> &buf)
+{
+	nalu->len = buf->size();
+	nalu->buf = buf->data();
+	nalu->forbidden_bit = nalu->buf[0] & 0x80;		//1 bit
+	nalu->nal_reference_idc = nalu->buf[0] & 0x60;	//2 bit
+	nalu->nal_unit_type = (nalu->buf[0]) & 0x1f;	//5 bit
+	return 0;//返回两个开始字符之间间隔的字节数，即包含有前缀的NALU的长度
 }
 
-void ARTPConnection::onInjectPacket(const sp<AMessage> &msg) {
-    int32_t index;
-    CHECK(msg->findInt32("index", &index));
-
-    sp<RefBase> obj;
-    CHECK(msg->findObject("buffer", &obj));
-
-    sp<ABuffer> buffer = static_cast<ABuffer *>(obj.get());
-
-    List<StreamInfo>::iterator it = mStreams.begin();
-    while (it != mStreams.end()
-           && it->mRTPSocket != index && it->mRTCPSocket != index) {
-        ++it;
-    }
-
-    if (it == mStreams.end()) {
-        TRESPASS();
-    }
-
-    StreamInfo *s = &*it;
-
-    status_t err;
-    if (it->mRTPSocket == index) {
-        err = parseRTP(s, buffer);
-    } else {
-        err = parseRTCP(s, buffer);
-    }
+void ARTPConnection::dump(NALU_t *n)
+{
+	if (!n)return;
+	LOGI(LOG_TAG,"nal length:%d nal_unit_type: %x\n", n->len,n->nal_unit_type);
 }
-
-void ARTPConnection::fakeTimestamps() {
-    (new AMessage(kWhatFakeTimestamps, id()))->post();
-}
-
-void ARTPConnection::onFakeTimestamps() {
-    List<StreamInfo>::iterator it = mStreams.begin();
-    while (it != mStreams.end()) {
-        StreamInfo &info = *it++;
-
-        for (size_t j = 0; j < info.mSources.size(); ++j) {
-            sp<ARTPSource> source = info.mSources.valueAt(j);
-
-            if (!source->timeEstablished()) {
-                source->timeUpdate(0, 0);
-                source->timeUpdate(0 + 90000, 0x100000000ll);
-
-                mFlags |= kFakeTimestamps;
-            }
-        }
-    }
-}
-
 

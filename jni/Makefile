@@ -14,8 +14,8 @@ OBJ=                   \
 	AAtomizer.o        \
 	ARTSPConnection.o  \
 	MyRTSPHandler.o    \
-	ARTPSource.o
-
+	ARTPSource.o       \
+	ARTPConnection.o
 
 CC=g++
 CFLAGS=-Wno-multichar

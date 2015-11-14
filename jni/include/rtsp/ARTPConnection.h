@@ -19,12 +19,13 @@
 #define A_RTP_CONNECTION_H_
 
 #include "foundation/AHandler.h"
+#include "rtsp/ARTPSource.h"
 //#include <utils/List.h>
 
 
 struct ABuffer;
 struct ARTPSource;
-struct ASessionDescription;
+//struct ASessionDescription;
 
 struct ARTPConnection : public AHandler {
     enum Flags {
@@ -45,12 +46,107 @@ struct ARTPConnection : public AHandler {
 		uint32_t ssrc;	   //32bit
 		
 	}RTPHeader;
+	
+	/******************************************************************
+	RTP_FIXED_HEADER
+	0					1					2					3
+	0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
+	+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+	|V=2|P|X|  CC	|M| 	PT		|		sequence number 		|
+	+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+	|							timestamp							|
+	+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+	|			synchronization source (SSRC) identifier			|
+	+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+
+	|			 contributing source (CSRC) identifiers 			|
+	|							  ....								|
+	+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+	
+	******************************************************************/
+	typedef struct 
+	{
+		/* byte 0 */
+		unsigned char csrc_len:4; /* CC expect 0 */
+		unsigned char extension:1;/* X	expect 1, see RTP_OP below */
+		unsigned char padding:1;  /* P	expect 0 */
+		unsigned char version:2;  /* V	expect 2 */
+		/* byte 1 */
+		unsigned char payload:7; /* PT	RTP_PAYLOAD_RTSP */
+		unsigned char marker:1;  /* M	expect 1 */
+		/* byte 2,3 */
+		unsigned short seq_no;	 /*sequence number*/
+		/* byte 4-7 */
+		unsigned  long timestamp;
+		/* byte 8-11 */
+		unsigned long ssrc; /* stream number is used here. */
+	} RTP_FIXED_HEADER;/*12 bytes*/
+	
+	/******************************************************************
+	NALU_HEADER
+	+---------------+
+	|0|1|2|3|4|5|6|7|
+	+-+-+-+-+-+-+-+-+
+	|F|NRI|  Type	|
+	+---------------+
+	******************************************************************/
+	typedef struct {
+		//byte 0
+		unsigned char TYPE:5;
+		unsigned char NRI:2;
+		unsigned char F:1;
+	} NALU_HEADER; /* 1 byte */
+	
+	
+	/******************************************************************
+	FU_INDICATOR
+	+---------------+
+	|0|1|2|3|4|5|6|7|
+	+-+-+-+-+-+-+-+-+
+	|F|NRI|  Type	|
+	+---------------+
+	******************************************************************/
+	typedef struct {
+		//byte 0
+		unsigned char TYPE:5;
+		unsigned char NRI:2; 
+		unsigned char F:1;		   
+	} FU_INDICATOR; /*1 byte */
+	
+	
+	/******************************************************************
+	FU_HEADER
+	+---------------+
+	|0|1|2|3|4|5|6|7|
+	+-+-+-+-+-+-+-+-+
+	|S|E|R|  Type	|
+	+---------------+
+	******************************************************************/
+	typedef struct {
+		//byte 0
+		unsigned char TYPE:5;
+		unsigned char R:1;
+		unsigned char E:1;
+		unsigned char S:1;	  
+	} FU_HEADER; /* 1 byte */
+	
+	typedef struct
+	{
+		unsigned len;				  //! Length of the NAL unit (Excluding the start code, which does not belong to the NALU)
+		unsigned max_size;			  //! Nal Unit Buffer size
+		int forbidden_bit;			  //! should be always FALSE
+		int nal_reference_idc;		  //! NALU_PRIORITY_xxxx
+		int nal_unit_type;			  //! NALU_TYPE_xxxx	
+		char *buf;					  //! contains the first byte followed by the EBSP
+		unsigned short lost_packets;  //! true, if packet loss is detected
+	} NALU_t;
+
 
     ARTPConnection(uint32_t flags = 0);
 
     void addStream(
             int rtpSocket, int rtcpSocket,
-            const sp<ASessionDescription> &sessionDesc, size_t index,
+            //const sp<ASessionDescription> &sessionDesc, 
+            size_t index,
             const sp<AMessage> &notify,
             bool injected);
 
@@ -65,6 +161,8 @@ struct ARTPConnection : public AHandler {
             int *rtpSocket, int *rtcpSocket, unsigned *rtpPort);
 
     void fakeTimestamps();
+
+	void setSource(ARTPSource*  src);
 
 protected:
     virtual ~ARTPConnection();
@@ -86,8 +184,10 @@ private:
     uint32_t mFlags;
 	uint32_t mTimestamp;//RTP timestamp
 	RTPHeader mRTPHeader;
-    struct StreamInfo;
-	StreamInfo mStreams;
+
+	ARTPSource* mRTPSource;
+//    struct StreamInfo;
+//	StreamInfo mStreams;
     //List<StreamInfo> mStreams;
 
     bool mPollEventPending;
@@ -100,12 +200,16 @@ private:
     void onSendReceiverReports();
     void onFakeTimestamps();
 
-    status_t receive(StreamInfo *info, bool receiveRTP);
+	void makeRTPHeader(RTPHeader* h,uint8_t out[12]);
+	int GetAnnexbNALU (NALU_t *nalu,const sp<ABuffer> &buf);
+	void dump(NALU_t *n);
 
-    status_t parseRTP(StreamInfo *info, const sp<ABuffer> &buffer);
-    status_t parseRTCP(StreamInfo *info, const sp<ABuffer> &buffer);
-    status_t parseSR(StreamInfo *info, const uint8_t *data, size_t size);
-    status_t parseBYE(StreamInfo *info, const uint8_t *data, size_t size);
+//    status_t receive(StreamInfo *info, bool receiveRTP);
+
+//    status_t parseRTP(StreamInfo *info, const sp<ABuffer> &buffer);
+//    status_t parseRTCP(StreamInfo *info, const sp<ABuffer> &buffer);
+//    status_t parseSR(StreamInfo *info, const uint8_t *data, size_t size);
+//    status_t parseBYE(StreamInfo *info, const uint8_t *data, size_t size);
 
     sp<ARTPSource> findSource(StreamInfo *info, uint32_t id);
 

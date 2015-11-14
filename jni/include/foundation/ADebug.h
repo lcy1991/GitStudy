@@ -28,6 +28,7 @@
 #include <string.h>
 #include <stdarg.h>
 #endif
+#define MTU_SIZE     1464
 
 #define LITERAL_TO_STRING_INTERNAL(x)    #x
 #define LITERAL_TO_STRING(x) LITERAL_TO_STRING_INTERNAL(x)

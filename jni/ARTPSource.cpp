@@ -155,8 +155,6 @@ ARTPSource::ARTPSource(uint32_t bufNum, uint32_t bufSize)
 		}
 	pInInputQ = &mInputQueue;
 	pOutOutputQ = &mOutputQueue;
-//	mOutputQLock.lock();//test
-	mFirstOutputPop = 1;
 
 }
 

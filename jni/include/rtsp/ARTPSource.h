@@ -1,3 +1,7 @@
+#ifndef A_RTP_SOURCE_H_
+
+#define A_RTP_SOURCE_H_
+
 #include <queue>
 #include "foundation/ABuffer.h"
 #include "foundation/Mutex.h"
@@ -29,11 +33,10 @@ struct ARTPSource
 	int inputQPush(const sp<ABuffer> &buf);
 	int outputQPop(sp<ABuffer> &buf);
 	int outputQPush(const sp<ABuffer> &buf);
-	
+	uint8_t mFramerate;
 private:
 	uint32_t mBufSize;
 	uint32_t mBufNum;
-	int mFirstOutputPop;
 	MyQueue mInputQueue;
 	MyQueue mOutputQueue;
 	MyQueue* pInInputQ;
@@ -44,10 +47,4 @@ private:
 };
 
 
-
-
-
-
-
-
-
+#endif
