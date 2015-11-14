@@ -70,17 +70,7 @@ static uint64_t u64at(const uint8_t *data) {
 // static
 const int64_t ARTPConnection::kSelectTimeoutUs = 1000ll;
 
-struct ARTPConnection::StreamInfo {
-    int mRTPSocket;
-    int mRTCPSocket;
-//    sp<ASessionDescription> mSessionDesc;
-    size_t mIndex;
-    sp<AMessage> mNotifyMsg;
-//    KeyedVector<uint32_t, sp<ARTPSource> > mSources;
-    struct sockaddr_in mRemoteRTCPAddr;
 
-//    bool mIsInjected;
-};
 
 ARTPConnection::ARTPConnection(uint32_t flags)
     : mFlags(flags),
@@ -122,6 +112,7 @@ static void bumpSocketBufferSize(int s) {
 /**/
 unsigned ARTPConnection::MakePortPair(
         int *rtpSocket, int *rtcpSocket, struct sockaddr_in addr) {
+    unsigned port ;
     *rtpSocket = socket(AF_INET, SOCK_DGRAM, 0);
     CHECK_GE(*rtpSocket, 0);
 
@@ -135,11 +126,8 @@ unsigned ARTPConnection::MakePortPair(
     unsigned start = (rand() * 1000)/ RAND_MAX + 15550;
     start &= ~1;
 
-    for (unsigned port = start; port < 65536; port += 2) {
-//        struct sockaddr_in addr;
-//        memset(addr.sin_zero, 0, sizeof(addr.sin_zero));
-//        addr.sin_family = AF_INET;
-//        addr.sin_addr.s_addr = INADDR_ANY;
+    for (port = start; port < 65536; port += 2) {
+
 		addr.sin_port = htons(port);
 
         if (bind(*rtpSocket,
@@ -151,7 +139,6 @@ unsigned ARTPConnection::MakePortPair(
 
         if (bind(*rtcpSocket,
                  (const struct sockaddr *)&addr, sizeof(addr)) == 0) {
-            *rtpPort = port;
             break;//return port;
         }
     }
@@ -201,13 +188,6 @@ void ARTPConnection::onMessageReceived(const sp<AMessage> &msg) {
             onInjectPacket(msg);
             break;
         }
-
-        case kWhatFakeTimestamps:
-        {
-            onFakeTimestamps();
-            break;
-        }
-
         default:
         {
             TRESPASS();
@@ -217,8 +197,8 @@ void ARTPConnection::onMessageReceived(const sp<AMessage> &msg) {
 }
 
 void ARTPConnection::onAddStream(const sp<AMessage> &msg) {
-//    mStreams.push_back(StreamInfo());
-//    StreamInfo *info = &*--mStreams.end();
+    mStreams.push_back(StreamInfo());
+    StreamInfo *info = &*--mStreams.end();
 
     int32_t s;
     CHECK(msg->findInt32("rtp-socket", &s));
@@ -226,20 +206,10 @@ void ARTPConnection::onAddStream(const sp<AMessage> &msg) {
     CHECK(msg->findInt32("rtcp-socket", &s));
     mStreams.mRTCPSocket = s;
 
-//    int32_t injected;
-//    CHECK(msg->findInt32("injected", &injected));
-
-//    info->mIsInjected = injected;
-
-//    sp<RefBase> obj;
-//    CHECK(msg->findObject("session-desc", &obj));
-//    info->mSessionDesc = static_cast<ASessionDescription *>(obj.get());
-
     CHECK(msg->findSize("index", &mStreams.mIndex));
     CHECK(msg->findMessage("notify", &mStreams.mNotifyMsg));
 
     memset(&mStreams.mRemoteRTCPAddr, 0, sizeof(mStreams.mRemoteRTCPAddr));
-
 
 }
 
@@ -247,8 +217,8 @@ void ARTPConnection::onRemoveStream(const sp<AMessage> &msg) {
     int32_t rtpSocket, rtcpSocket;
     CHECK(msg->findInt32("rtp-socket", &rtpSocket));
     CHECK(msg->findInt32("rtcp-socket", &rtcpSocket));
-/*
-    List<StreamInfo>::iterator it = mStreams.begin();
+
+    list<StreamInfo>::iterator it = mStreams.begin();
     while (it != mStreams.end()
            && (it->mRTPSocket != rtpSocket || it->mRTCPSocket != rtcpSocket)) {
         ++it;
@@ -258,7 +228,7 @@ void ARTPConnection::onRemoveStream(const sp<AMessage> &msg) {
         TRESPASS();
     }
 
-    mStreams.erase(it);*/
+    mStreams.erase(it);
 }
 
 

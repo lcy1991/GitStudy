@@ -20,12 +20,23 @@
 
 #include "foundation/AHandler.h"
 #include "rtsp/ARTPSource.h"
-//#include <utils/List.h>
+#include<list>
+#include <sys/socket.h>
+#include <arpa/inet.h>
 
+using namespace std;
 
 struct ABuffer;
 struct ARTPSource;
 //struct ASessionDescription;
+
+struct StreamInfo {
+	int mRTPSocket;
+	int mRTCPSocket;
+	size_t mIndex;
+	sp<AMessage> mNotifyMsg;
+	struct sockaddr_in mRemoteRTCPAddr;
+};
 
 struct ARTPConnection : public AHandler {
     enum Flags {
@@ -157,8 +168,8 @@ struct ARTPConnection : public AHandler {
     // Creates a pair of UDP datagram sockets bound to adjacent ports
     // (the rtpSocket is bound to an even port, the rtcpSocket to the
     // next higher port).
-    static void MakePortPair(
-            int *rtpSocket, int *rtcpSocket, unsigned *rtpPort);
+    unsigned MakePortPair(
+           int *rtpSocket, int *rtcpSocket, struct sockaddr_in addr);
 
     void fakeTimestamps();
 
@@ -186,9 +197,9 @@ private:
 	RTPHeader mRTPHeader;
 
 	ARTPSource* mRTPSource;
-//    struct StreamInfo;
-//	StreamInfo mStreams;
-    //List<StreamInfo> mStreams;
+
+
+    list<StreamInfo> mStreams;
 
     bool mPollEventPending;
     int64_t mLastReceiverReportTimeUs;
@@ -197,9 +208,7 @@ private:
     void onRemoveStream(const sp<AMessage> &msg);
     void onPollStreams();
     void onInjectPacket(const sp<AMessage> &msg);
-    void onSendReceiverReports();
-    void onFakeTimestamps();
-
+	void onSendPacket(const sp<AMessage> &msg);
 	void makeRTPHeader(RTPHeader* h,uint8_t out[12]);
 	int GetAnnexbNALU (NALU_t *nalu,const sp<ABuffer> &buf);
 	void dump(NALU_t *n);
@@ -210,6 +219,7 @@ private:
 //    status_t parseRTCP(StreamInfo *info, const sp<ABuffer> &buffer);
 //    status_t parseSR(StreamInfo *info, const uint8_t *data, size_t size);
 //    status_t parseBYE(StreamInfo *info, const uint8_t *data, size_t size);
+	bool isFirstNalu(uint8_t* data,size_t length);
 
     sp<ARTPSource> findSource(StreamInfo *info, uint32_t id);
 
