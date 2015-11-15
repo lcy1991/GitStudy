@@ -8,7 +8,8 @@
 #include "rtsp/ARTPConnection.h"
 
 
-ARTPSource mysource(5,1500); 
+ARTPSource mysource(5,50000); 
+int GetAnnexbNALU (sp<ABuffer> nalu);
 
 
 void* sendbuf(void* agr)
@@ -53,10 +54,12 @@ void* getbuf(void* arg)
 				}
 		}	
 }
+FILE* bits;
 int main()
 {
 	printf("abc\n");
-#if 0
+	bits = fopen("test.264","r");
+#if 1
 	uint32_t i;
 	char* tmp = "1234567890\r\n1234567";
 	handler_1* handler1 = new handler_1();
@@ -88,8 +91,8 @@ int main()
 
 	MyRTSPHandler handler_rtsp;
 	handler_rtsp.StartServer();
-#elseif 0
-
+#endif
+#if 0
 pthread_t idsend;
 pthread_t idget;
 
@@ -107,6 +110,7 @@ pthread_join(idget,&status);
 
 #else
 
+#if 0
 ARTPConnection* RTPConn = new ARTPConnection();
 ALooper* looper1 =	new ALooper;
 looper1->registerHandler(RTPConn);
@@ -128,20 +132,18 @@ address.sin_addr.s_addr=inet_addr("127.0.0.1");//这里不一样
 address.sin_port=htons(6789); 
 
 RTPConn->addStream(rtpsock,rtcpsock,0,&address);
+#endif
 
 sp<ABuffer> tmpbuf;
-
-uint8_t testbuf[1300];
-testbuf[0]=0x65;
-testbuf[1]=0x88;	
-testbuf[2]=0x20;
-testbuf[3]=0x00;
-for(int i = 0; ;)
+int Len;
+int i=0;
+while(!feof(bits))
 {
 	if(mysource.inputQPop(tmpbuf)>=0)
 		{
-			memcpy(tmpbuf->data(),testbuf,1300);
-			tmpbuf->setRange(0,1300);
+			Len = GetAnnexbNALU(tmpbuf);
+			tmpbuf->setRange(0,Len);
+			printf("get a NALU length:%d NUM:%d\n",Len,i++);
 			mysource.inputQPush(tmpbuf);
 		}
 }
@@ -149,9 +151,111 @@ for(int i = 0; ;)
 
 
 
-#endif
+
 
 	return 0;
+}
+
+static int FindStartCode2 (unsigned char *Buf)
+{
+	if(Buf[0]!=0 || Buf[1]!=0 || Buf[2] !=1) return 0; //判断是否为0x000001,如果是返回1
+	else return 1;
+}
+
+static int FindStartCode3 (unsigned char *Buf)
+{
+	if(Buf[0]!=0 || Buf[1]!=0 || Buf[2] !=0 || Buf[3] !=1) return 0;//判断是否为0x00000001,如果是返回1
+	else return 1;
+}
+
+
+//这个函数输入为一个NAL结构体，主要功能为得到一个完整的NALU并保存在NALU_t的buf中，
+//获取他的长度，填充F,IDC,TYPE位。
+//并且返回两个开始字符之间间隔的字节数，即包含有前缀的NALU的长度
+int GetAnnexbNALU (sp<ABuffer> nalu)
+{
+	int pos = 0;
+	int StartCodeFound, rewind;
+//	unsigned char *Buf;
+	int info2,info3,startcodeprefix_len,len;
+
+	unsigned char Buf[50000];
+
+	startcodeprefix_len=3;//初始化码流序列的开始字符为3个字节
+
+	if (3 != fread (Buf, 1, 3, bits))//从码流中读3个字节
+	{
+		//free(Buf);
+		return 0;
+	}
+	info2 = FindStartCode2 (Buf);//判断是否为0x000001 
+	if(info2 != 1) 
+	{
+		//如果不是，再读一个字节
+		if(1 != fread(Buf+3, 1, 1, bits))//读一个字节
+		{
+			//free(Buf);
+			return 0;
+		}
+		info3 = FindStartCode3 (Buf);//判断是否为0x00000001
+		if (info3 != 1)//如果不是，返回-1
+		{ 
+			//free(Buf);
+			return -1;
+		}
+		else 
+		{
+			//如果是0x00000001,得到开始前缀为4个字节
+			pos = 4;
+			startcodeprefix_len = 4;
+		}
+	}
+	else
+	{
+		//如果是0x000001,得到开始前缀为3个字节
+		startcodeprefix_len = 3;
+		pos = 3;
+	}
+	//查找下一个开始字符的标志位
+	StartCodeFound = 0;
+	info2 = 0;
+	info3 = 0;
+
+	while (!StartCodeFound)
+	{
+		if (feof (bits))//判断是否到了文件尾
+		{
+			len = (pos-1)- startcodeprefix_len;
+			memcpy (nalu->data(), &Buf[startcodeprefix_len], len);     
+			//free(Buf);
+			return pos-1;
+		}
+		Buf[pos++] = fgetc (bits);//读一个字节到BUF中
+		info3 = FindStartCode3(&Buf[pos-4]);//判断是否为0x00000001
+		if(info3 != 1)
+			info2 = FindStartCode2(&Buf[pos-3]);//判断是否为0x000001
+		StartCodeFound = (info2 == 1 || info3 == 1);
+	}
+
+	// Here, we have found another start code (and read length of startcode bytes more than we should
+	// have.  Hence, go back in the file
+	rewind = (info3 == 1)? -4 : -3;
+
+	if (0 != fseek (bits, rewind, SEEK_CUR))//把文件指针指向前一个NALU的末尾
+	{
+		//free(Buf);
+		printf("GetAnnexbNALU: Cannot fseek in the bit stream file");
+	}
+
+	// Here the Start code, the complete NALU, and the next start code is in the Buf.  
+	// The size of Buf is pos, pos+rewind are the number of bytes excluding the next
+	// start code, and (pos+rewind)-startcodeprefix_len is the size of the NALU excluding the start code
+
+	len = (pos+rewind)-startcodeprefix_len;
+	memcpy (nalu->data(), &Buf[startcodeprefix_len], len);//拷贝一个完整NALU，不拷贝起始前缀0x000001或0x00000001
+	//free(Buf);
+
+	return (pos+rewind);//返回两个开始字符之间间隔的字节数，即包含有前缀的NALU的长度
 }
 
 

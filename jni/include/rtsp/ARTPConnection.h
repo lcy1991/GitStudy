@@ -185,6 +185,8 @@ protected:
 private:
 
 	
+	uint32_t timeStamp;
+	uint16_t seqNum;
 
     static const int64_t kSelectTimeoutUs;
 	uint32_t mRtpPort;

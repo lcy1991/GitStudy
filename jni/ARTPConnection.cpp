@@ -77,6 +77,8 @@ ARTPConnection::ARTPConnection(uint32_t flags)
       mPollEventPending(false),
       mThreadRunFlag(false),
       mLastReceiverReportTimeUs(-1) {
+      timeStamp = 0;
+	  seqNum = 0;
 }
 
 ARTPConnection::~ARTPConnection() {
@@ -86,6 +88,7 @@ void ARTPConnection::addStream(
         int rtpSocket, int rtcpSocket,
         size_t index,struct sockaddr_in* address) 
 {
+	LOGI(LOG_TAG,"add Stream index %d",index);
     sp<AMessage> msg = new AMessage(kWhatAddStream, id());
     msg->setInt32("rtp-socket", rtpSocket);
     msg->setInt32("rtcp-socket", rtcpSocket);
@@ -95,6 +98,7 @@ void ARTPConnection::addStream(
 }
 
 void ARTPConnection::removeStream(int index) {
+	LOGI(LOG_TAG,"remove Stream index %d",index);
     sp<AMessage> msg = new AMessage(kWhatRemoveStream, id());
     msg->setInt32("index", index);
     msg->post();
@@ -231,14 +235,10 @@ void ARTPConnection::setSource(ARTPSource* src)
 
 status_t ARTPConnection::RTPPacket(sp<ABuffer> buf)
 {
-	static uint32_t timeStamp = 0;
-	static uint16_t seqNum;
+
 	static uint8_t sendbuf[UDP_MAX_SIZE];
 	uint32_t bytes; 
-	//static sp<ABuffer> preBuf = new ABuffer(MTU_SIZE);
-	//sp<ABuffer> swapBuf;
 	uint8_t* nalu_payload;
-	//RTP header 12 bytes
 	if(isFirstNalu(buf->data(),buf->size()))
 		timeStamp+=(unsigned int)(90000.0 / mRTPSource->mFramerate);
 	NALU_t nalu;
@@ -251,8 +251,8 @@ status_t ARTPConnection::RTPPacket(sp<ABuffer> buf)
 	GetAnnexbNALU(&nalu,buf);//每执行一次，文件的指针指向本次找到的NALU的末尾，下一个位置即为下个NALU的起始码0x000001
 	dump(&nalu);//输出NALU长度和TYPE
 
-	//memset(sendbuf,0,1500);//清空sendbuf；此时会将上次的时间戳清空，因此需要ts_current来保存上次的时间戳值
-
+	//memset(sendbuf,0,UDP_MAX_SIZE);//清空sendbuf；此时会将上次的时间戳清空，因此需要ts_current来保存上次的时间戳值
+//	LOGI(LOG_TAG,"RTP TimeStamp %d  seq %d",timeStamp,seqNum);
 	//rtp固定包头，为12字节,该句将sendbuf[0]的地址赋给rtp_hdr，以后对rtp_hdr的写入操作将直接写入sendbuf。
 	rtp_hdr =(RTP_FIXED_HEADER*)&sendbuf[0]; 
 	
@@ -267,7 +267,8 @@ status_t ARTPConnection::RTPPacket(sp<ABuffer> buf)
 		LOGI(LOG_TAG,"nalu length < UDP_MAX_SIZE");
 		//设置rtp M 位；
 		rtp_hdr->marker=1;
-		rtp_hdr->seq_no = htons(seqNum ++); //序列号，每发送一个RTP包增1
+		rtp_hdr->seq_no = htons(seqNum++); //序列号，每发送一个RTP包增1
+//		LOGI(LOG_TAG,"ts %d",seqNum);
 		rtp_hdr->timestamp=htonl(timeStamp);
 		//设置NALU HEADER,并将这个HEADER填入sendbuf[12]
 		nalu_hdr =(NALU_HEADER*)&sendbuf[12]; //将sendbuf[12]的地址赋给nalu_hdr，之后对nalu_hdr的写入就将写入sendbuf中；
@@ -281,7 +282,7 @@ status_t ARTPConnection::RTPPacket(sp<ABuffer> buf)
 		//timeStamp = timeStamp + timestamp_increse;
 		
 		bytes = nalu.len + 12 ; //获得sendbuf的长度,为nalu的长度（包含NALU头但除去起始前缀）加上rtp_header的固定长度12字节
-		LOGI(LOG_TAG,"socket sendRTPPacket");
+		LOGI(LOG_TAG,"socket send RTP packet seqnum:%d timeStamp: %d",seqNum,timeStamp);
 		sendRTPPacket(sendbuf,bytes);//send(socket1,sendbuf,bytes,0);//发送RTP包
 
 	}else{
@@ -292,13 +293,11 @@ status_t ARTPConnection::RTPPacket(sp<ABuffer> buf)
 		int lastPackSize = nalu.len - (packetNum-1)*UDP_MAX_SIZE;
 		int packetIndex = 1 ;
 
-		//timeStamp = timeStamp + timestamp_increse;
-
 		rtp_hdr->timestamp = htonl(timeStamp);
 
 		//发送第一个的FU，S=1，E=0，R=0
-
-		rtp_hdr->seq_no = htons(seqNum++); //序列号，每发送一个RTP包增1
+		rtp_hdr->seq_no = htons(seqNum++); //序列号，每发送一个RTP包增1  
+//		LOGI(LOG_TAG,"ts %d",seqNum);
 		//设置rtp M 位；
 		rtp_hdr->marker=0;
 		//设置FU INDICATOR,并将这个HEADER填入sendbuf[12]
@@ -317,13 +316,14 @@ status_t ARTPConnection::RTPPacket(sp<ABuffer> buf)
 		nalu_payload=&sendbuf[14];//同理将sendbuf[14]赋给nalu_payload
 		memcpy(nalu_payload,nalu.buf+1,UDP_MAX_SIZE);//去掉NALU头
 		bytes=UDP_MAX_SIZE+14;//获得sendbuf的长度,为nalu的长度（除去起始前缀和NALU头）加上rtp_header，fu_ind，fu_hdr的固定长度14字节
+		LOGI(LOG_TAG,"socket send RTP packet seqnum:%d timeStamp: %d",seqNum,timeStamp);
 		sendRTPPacket(sendbuf,bytes);//send( socket1, sendbuf, bytes, 0 );//发送RTP包
 
 		//发送中间的FU，S=0，E=0，R=0
 		for(packetIndex=2;packetIndex<packetNum;packetIndex++)
 		{
 			rtp_hdr->seq_no = htons(seqNum++); //序列号，每发送一个RTP包增1
-	 
+//	 		LOGI(LOG_TAG,"ts %d",seqNum);
 			//设置rtp M 位；
 			rtp_hdr->marker=0;
 			//设置FU INDICATOR,并将这个HEADER填入sendbuf[12]
@@ -342,12 +342,14 @@ status_t ARTPConnection::RTPPacket(sp<ABuffer> buf)
 			nalu_payload=&sendbuf[14];//同理将sendbuf[14]的地址赋给nalu_payload
 			memcpy(nalu_payload,nalu.buf+(packetIndex-1)*UDP_MAX_SIZE+1,UDP_MAX_SIZE);//去掉起始前缀的nalu剩余内容写入sendbuf[14]开始的字符串。
 			bytes=UDP_MAX_SIZE+14;//获得sendbuf的长度,为nalu的长度（除去原NALU头）加上rtp_header，fu_ind，fu_hdr的固定长度14字节
+			LOGI(LOG_TAG,"socket send RTP packet seqnum:%d timeStamp: %d",seqNum,timeStamp);
 			sendRTPPacket(sendbuf,bytes);//send( socket1, sendbuf, bytes, 0 );//发送rtp包				
 		}
 
 		//发送最后一个的FU，S=0，E=1，R=0
 	
 		rtp_hdr->seq_no = htons(seqNum ++);
+		LOGI(LOG_TAG,"ts %d",seqNum);
 		//设置rtp M 位；当前传输的是最后一个分片时该位置1		
 		rtp_hdr->marker=1;
 		//设置FU INDICATOR,并将这个HEADER填入sendbuf[12]
@@ -366,6 +368,7 @@ status_t ARTPConnection::RTPPacket(sp<ABuffer> buf)
 		nalu_payload=&sendbuf[14];//同理将sendbuf[14]的地址赋给nalu_payload
 		memcpy(nalu_payload,nalu.buf+(packetIndex-1)*UDP_MAX_SIZE+1,lastPackSize-1);//将nalu最后剩余的-1(去掉了一个字节的NALU头)字节内容写入sendbuf[14]开始的字符串。
 		bytes=lastPackSize-1+14;//获得sendbuf的长度,为剩余nalu的长度l-1加上rtp_header，FU_INDICATOR,FU_HEADER三个包头共14字节
+		LOGI(LOG_TAG,"socket send RTP packet seqnum:%d timeStamp: %d",seqNum,timeStamp);
 		sendRTPPacket(sendbuf,bytes);//send( socket1, sendbuf, bytes, 0 );//发送rtp包		
 	}
 	return 0;
