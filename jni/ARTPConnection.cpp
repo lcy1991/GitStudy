@@ -264,6 +264,7 @@ status_t ARTPConnection::RTPPacket(sp<ABuffer> buf)
 
 	//当一个NALU小于1400字节的时候，采用一个单RTP包发送
 	if(nalu.len <= UDP_MAX_SIZE){
+		LOGI(LOG_TAG,"nalu length < UDP_MAX_SIZE");
 		//设置rtp M 位；
 		rtp_hdr->marker=1;
 		rtp_hdr->seq_no = htons(seqNum ++); //序列号，每发送一个RTP包增1
@@ -280,6 +281,7 @@ status_t ARTPConnection::RTPPacket(sp<ABuffer> buf)
 		//timeStamp = timeStamp + timestamp_increse;
 		
 		bytes = nalu.len + 12 ; //获得sendbuf的长度,为nalu的长度（包含NALU头但除去起始前缀）加上rtp_header的固定长度12字节
+		LOGI(LOG_TAG,"socket sendRTPPacket");
 		sendRTPPacket(sendbuf,bytes);//send(socket1,sendbuf,bytes,0);//发送RTP包
 
 	}else{
@@ -381,14 +383,9 @@ void ARTPConnection::sendRTPPacket(const uint8_t* buf ,size_t bytes)
 					it->mRTPSocket, buf, bytes, 0,
 					(const struct sockaddr *)&it->mRemoteRTPAddr, sizeof(it->mRemoteRTPAddr));	
 			//CHECK_EQ(n, (ssize_t)buffer->size());
+			if(n!=bytes)LOGE(LOG_TAG,"socket send rtp error!");
 	        ++it;
 	    }
-
-    if (it == mStreams.end()) {
-        TRESPASS();
-    }
-
-    mStreams.erase(it);
 }
 
 

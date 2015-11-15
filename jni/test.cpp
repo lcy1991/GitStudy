@@ -123,16 +123,20 @@ RTPConn->setSource(&mysource);
 
 //MakePortPair(&rtpsock,&rtcpsock,address);
 printf("MakePortPair %d\n",MakePortPair(&rtpsock,&rtcpsock,address));
+address.sin_family=AF_INET;  
+address.sin_addr.s_addr=inet_addr("127.0.0.1");//这里不一样  
+address.sin_port=htons(6789); 
+
 RTPConn->addStream(rtpsock,rtcpsock,0,&address);
 
 sp<ABuffer> tmpbuf;
 
 uint8_t testbuf[1300];
 testbuf[0]=0x65;
-testbuf[0]=0x88;	
-testbuf[0]=0x20;
-testbuf[0]=0x00;
-for(int i = 0; i< 100 ;i++)
+testbuf[1]=0x88;	
+testbuf[2]=0x20;
+testbuf[3]=0x00;
+for(int i = 0; ;)
 {
 	if(mysource.inputQPop(tmpbuf)>=0)
 		{
