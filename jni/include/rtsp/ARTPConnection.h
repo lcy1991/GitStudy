@@ -33,9 +33,13 @@ struct ARTPSource;
 struct StreamInfo {
 	int mRTPSocket;
 	int mRTCPSocket;
-	size_t mIndex;
+	int mIndex;
 	sp<AMessage> mNotifyMsg;
-	struct sockaddr_in mRemoteRTCPAddr;
+	struct sockaddr_in mRemoteRTPAddr;
+};
+enum {
+	kWhatAddStream,
+	kWhatRemoveStream,
 };
 
 struct ARTPConnection : public AHandler {
@@ -147,21 +151,20 @@ struct ARTPConnection : public AHandler {
 		int forbidden_bit;			  //! should be always FALSE
 		int nal_reference_idc;		  //! NALU_PRIORITY_xxxx
 		int nal_unit_type;			  //! NALU_TYPE_xxxx	
-		char *buf;					  //! contains the first byte followed by the EBSP
+		uint8_t *buf;					  //! contains the first byte followed by the EBSP
 		unsigned short lost_packets;  //! true, if packet loss is detected
 	} NALU_t;
+	
+
 
 
     ARTPConnection(uint32_t flags = 0);
 
     void addStream(
             int rtpSocket, int rtcpSocket,
-            //const sp<ASessionDescription> &sessionDesc, 
-            size_t index,
-            const sp<AMessage> &notify,
-            bool injected);
+            size_t index,struct sockaddr_in* address);
 
-    void removeStream(int rtpSocket, int rtcpSocket);
+    void removeStream(int index);
 
     void injectPacket(int index, const sp<ABuffer> &buffer);
 
@@ -180,14 +183,7 @@ protected:
     virtual void onMessageReceived(const sp<AMessage> &msg);
 
 private:
-    enum {
-        kWhatAddStream,
-        kWhatRemoveStream,
-        kWhatPollStreams,
-        kWhatInjectPacket,
-        kWhatSendPacket,
-        kWhatFakeTimestamps,
-    };
+
 	
 
     static const int64_t kSelectTimeoutUs;
@@ -195,15 +191,12 @@ private:
     uint32_t mFlags;
 	uint32_t mTimestamp;//RTP timestamp
 	RTPHeader mRTPHeader;
-
 	ARTPSource* mRTPSource;
-
-
     list<StreamInfo> mStreams;
-
+	Mutex mStreamLock;
     bool mPollEventPending;
     int64_t mLastReceiverReportTimeUs;
-
+	bool mThreadRunFlag;
     void onAddStream(const sp<AMessage> &msg);
     void onRemoveStream(const sp<AMessage> &msg);
     void onPollStreams();
@@ -212,6 +205,9 @@ private:
 	void makeRTPHeader(RTPHeader* h,uint8_t out[12]);
 	int GetAnnexbNALU (NALU_t *nalu,const sp<ABuffer> &buf);
 	void dump(NALU_t *n);
+	void sendRTPPacket(const uint8_t* buf ,size_t bytes);
+
+static	void* threadloop(void* arg);
 
 //    status_t receive(StreamInfo *info, bool receiveRTP);
 
@@ -220,6 +216,7 @@ private:
 //    status_t parseSR(StreamInfo *info, const uint8_t *data, size_t size);
 //    status_t parseBYE(StreamInfo *info, const uint8_t *data, size_t size);
 	bool isFirstNalu(uint8_t* data,size_t length);
+	status_t RTPPacket(sp<ABuffer> buf);
 
     sp<ARTPSource> findSource(StreamInfo *info, uint32_t id);
 

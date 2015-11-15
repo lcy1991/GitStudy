@@ -47,6 +47,9 @@ virtual void onMessageReceived(const sp<AMessage> &msg);
 	void onCloseSession(const sp<AMessage> &msg);
 	
 	void getDigest(const char* NONCE,const char* public_method,AString *result);
+
+	static unsigned MakePortPair(int *rtpSocket, int *rtcpSocket, struct sockaddr_in addr) ;
+	
 	int mSocket;
 	int mSocketAccept;
     uint32_t session_id;
@@ -75,6 +78,59 @@ Authorization: Digest username="test1", realm="Streaming Server", nonce="a72a726
 WWW-Authenticate: Digest realm="StreamingServer", nonce="a72a7266d6f903a8384b874d3e29e666"\r\n
 
 */
+	void bumpSocketBufferSize(int s) {
+			int size = 256 * 1024;
+			CHECK_EQ(setsockopt(s, SOL_SOCKET, SO_RCVBUF, &size, sizeof(size)), 0);
+	}
+	
+	unsigned MakePortPair(
+			int *rtpSocket, int *rtcpSocket, struct sockaddr_in addr) 
+	{
+		unsigned port ;
+		*rtpSocket = socket(AF_INET, SOCK_DGRAM, 0);
+		CHECK_GE(*rtpSocket, 0);
+	
+		bumpSocketBufferSize(*rtpSocket);
+	
+		*rtcpSocket = socket(AF_INET, SOCK_DGRAM, 0);
+		CHECK_GE(*rtcpSocket, 0);
+	
+		bumpSocketBufferSize(*rtcpSocket);
+	
+		unsigned start = (rand() * 1000)/ RAND_MAX + 15550;
+		start &= ~1;
+	
+		for (port = start; port < 65536; port += 2) {
+	
+			addr.sin_port = htons(port);
+	
+			if (bind(*rtpSocket,
+					 (const struct sockaddr *)&addr, sizeof(addr)) < 0) {
+				continue;
+			}
+	
+			addr.sin_port = htons(port + 1);
+	
+			if (bind(*rtcpSocket,
+					 (const struct sockaddr *)&addr, sizeof(addr)) == 0) {
+				break;//return port;
+			}
+		}
+	
+		addr.sin_port = htons(port);
+		if (connect(*rtpSocket,(const struct sockaddr *)&addr, sizeof(addr)) < 0) {
+			LOGE(LOG_TAG,"rtpSocket connect to client failed!");
+			return -1;
+		}
+		
+		addr.sin_port = htons(port + 1);
+		if (connect(*rtcpSocket,(const struct sockaddr *)&addr, sizeof(addr)) < 0) {
+			LOGE(LOG_TAG,"rtcpSocket connect to client failed!");
+			return -1;
+		}
+		return port;// return rtp port and rtcp port
+	
+	}
 
 
 

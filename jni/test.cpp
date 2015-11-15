@@ -5,9 +5,10 @@
 #include "foundation/ADebug.h"
 #include "rtsp/MyRTSPHandler.h"
 #include "rtsp/ARTPSource.h"
+#include "rtsp/ARTPConnection.h"
 
 
-ARTPSource mysource(5,20); 
+ARTPSource mysource(5,1500); 
 
 
 void* sendbuf(void* agr)
@@ -87,7 +88,7 @@ int main()
 
 	MyRTSPHandler handler_rtsp;
 	handler_rtsp.StartServer();
-#else
+#elseif 0
 
 pthread_t idsend;
 pthread_t idget;
@@ -103,6 +104,44 @@ ret=pthread_create(&idget,NULL,getbuf,NULL);
 void* status;
 pthread_join(idsend,&status);
 pthread_join(idget,&status);
+
+#else
+
+ARTPConnection* RTPConn = new ARTPConnection();
+ALooper* looper1 =	new ALooper;
+looper1->registerHandler(RTPConn);
+looper1->start();
+struct sockaddr_in address;//处理网络通信的地址  
+int rtpsock;
+int rtcpsock;
+
+bzero(&address,sizeof(address));	
+address.sin_family=AF_INET;  
+address.sin_addr.s_addr=inet_addr("127.0.0.1");//这里不一样  
+address.sin_port=htons(6789); 
+RTPConn->setSource(&mysource);
+
+//MakePortPair(&rtpsock,&rtcpsock,address);
+printf("MakePortPair %d\n",MakePortPair(&rtpsock,&rtcpsock,address));
+RTPConn->addStream(rtpsock,rtcpsock,0,&address);
+
+sp<ABuffer> tmpbuf;
+
+uint8_t testbuf[1300];
+testbuf[0]=0x65;
+testbuf[0]=0x88;	
+testbuf[0]=0x20;
+testbuf[0]=0x00;
+for(int i = 0; i< 100 ;i++)
+{
+	if(mysource.inputQPop(tmpbuf)>=0)
+		{
+			memcpy(tmpbuf->data(),testbuf,1300);
+			tmpbuf->setRange(0,1300);
+			mysource.inputQPush(tmpbuf);
+		}
+}
+
 
 
 

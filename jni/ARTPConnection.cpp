@@ -53,7 +53,7 @@ const uint8_t ff_ue_golomb_vlc_code[512]=
   };
 
 
-static const size_t kMaxUDPSize = 1500;
+static const size_t UDP_MAX_SIZE = 1500;
 
 static uint16_t u16at(const uint8_t *data) {
     return data[0] << 8 | data[1];
@@ -75,6 +75,7 @@ const int64_t ARTPConnection::kSelectTimeoutUs = 1000ll;
 ARTPConnection::ARTPConnection(uint32_t flags)
     : mFlags(flags),
       mPollEventPending(false),
+      mThreadRunFlag(false),
       mLastReceiverReportTimeUs(-1) {
 }
 
@@ -83,85 +84,22 @@ ARTPConnection::~ARTPConnection() {
 
 void ARTPConnection::addStream(
         int rtpSocket, int rtcpSocket,
-        size_t index,
-        const sp<AMessage> &notify,
-        bool injected) {
+        size_t index,struct sockaddr_in* address) 
+{
     sp<AMessage> msg = new AMessage(kWhatAddStream, id());
     msg->setInt32("rtp-socket", rtpSocket);
     msg->setInt32("rtcp-socket", rtcpSocket);
-    msg->setSize("index", index);
-    msg->setMessage("notify", notify);
-    msg->setInt32("injected", injected);
+    msg->setInt32("index", index);
+	msg->setPointer("RemoteRTPAddr",(void*)address);
     msg->post();
 }
 
-void ARTPConnection::removeStream(int rtpSocket, int rtcpSocket) {
+void ARTPConnection::removeStream(int index) {
     sp<AMessage> msg = new AMessage(kWhatRemoveStream, id());
-    msg->setInt32("rtp-socket", rtpSocket);
-    msg->setInt32("rtcp-socket", rtcpSocket);
+    msg->setInt32("index", index);
     msg->post();
 }
 
-static void bumpSocketBufferSize(int s) {
-    int size = 256 * 1024;
-    CHECK_EQ(setsockopt(s, SOL_SOCKET, SO_RCVBUF, &size, sizeof(size)), 0);
-}
-
-
-// static
-/**/
-unsigned ARTPConnection::MakePortPair(
-        int *rtpSocket, int *rtcpSocket, struct sockaddr_in addr) {
-    unsigned port ;
-    *rtpSocket = socket(AF_INET, SOCK_DGRAM, 0);
-    CHECK_GE(*rtpSocket, 0);
-
-    bumpSocketBufferSize(*rtpSocket);
-
-    *rtcpSocket = socket(AF_INET, SOCK_DGRAM, 0);
-    CHECK_GE(*rtcpSocket, 0);
-
-    bumpSocketBufferSize(*rtcpSocket);
-
-    unsigned start = (rand() * 1000)/ RAND_MAX + 15550;
-    start &= ~1;
-
-    for (port = start; port < 65536; port += 2) {
-
-		addr.sin_port = htons(port);
-
-        if (bind(*rtpSocket,
-                 (const struct sockaddr *)&addr, sizeof(addr)) < 0) {
-            continue;
-        }
-
-        addr.sin_port = htons(port + 1);
-
-        if (bind(*rtcpSocket,
-                 (const struct sockaddr *)&addr, sizeof(addr)) == 0) {
-            break;//return port;
-        }
-    }
-
-	addr.sin_port = htons(port);
-	if (connect(*rtpSocket,(const struct sockaddr *)&addr, sizeof(addr)) < 0) {
-		LOGE(LOG_TAG,"rtpSocket connect to client failed!");
-		return -1;
-	}
-	
-	addr.sin_port = htons(port + 1);
-	if (connect(*rtcpSocket,(const struct sockaddr *)&addr, sizeof(addr)) < 0) {
-		LOGE(LOG_TAG,"rtcpSocket connect to client failed!");
-		return -1;
-	}
-	return port;// return rtp port and rtcp port
-
-}
-
-void startSendPacket()
-{
-	
-}
 
 void ARTPConnection::onMessageReceived(const sp<AMessage> &msg) {
     switch (msg->what()) {
@@ -171,21 +109,9 @@ void ARTPConnection::onMessageReceived(const sp<AMessage> &msg) {
             break;
         }
 
-        case kWhatSendPacket:
-        {
-            onSendPacket(msg);
-            break;
-        }		
-
         case kWhatRemoveStream:
         {
             onRemoveStream(msg);
-            break;
-        }
-
-        case kWhatInjectPacket:
-        {
-            onInjectPacket(msg);
             break;
         }
         default:
@@ -197,30 +123,40 @@ void ARTPConnection::onMessageReceived(const sp<AMessage> &msg) {
 }
 
 void ARTPConnection::onAddStream(const sp<AMessage> &msg) {
+	Mutex::Autolock autoLock(mStreamLock);
     mStreams.push_back(StreamInfo());
-    StreamInfo *info = &*--mStreams.end();
-
+    StreamInfo* info = &*--mStreams.end();
     int32_t s;
     CHECK(msg->findInt32("rtp-socket", &s));
-    mStreams.mRTPSocket = s;
+    info->mRTPSocket = s;
     CHECK(msg->findInt32("rtcp-socket", &s));
-    mStreams.mRTCPSocket = s;
-
-    CHECK(msg->findSize("index", &mStreams.mIndex));
-    CHECK(msg->findMessage("notify", &mStreams.mNotifyMsg));
-
-    memset(&mStreams.mRemoteRTCPAddr, 0, sizeof(mStreams.mRemoteRTCPAddr));
-
+    info->mRTCPSocket = s;
+	CHECK(msg->findInt32("index", &s));
+    info->mIndex = s;
+	
+	void* RTPAddr;
+	CHECK(msg->findPointer("RemoteRTPAddr", &RTPAddr));
+	memset(&info->mRemoteRTPAddr, 0, sizeof(info->mRemoteRTPAddr));
+	struct sockaddr_in* tmpptr;
+	tmpptr = static_cast<struct sockaddr_in *>(RTPAddr);
+	info->mRemoteRTPAddr = *tmpptr;
+	if(mStreams.size()==1)
+		{
+			mThreadRunFlag = true;
+			pthread_t id;
+			pthread_create(&id,NULL,threadloop,(void*)this);
+			LOGI(LOG_TAG,"Create RTP transthread");
+		}
+	LOGI(LOG_TAG,"rtp connection add stream %d",info->mIndex);
 }
 
 void ARTPConnection::onRemoveStream(const sp<AMessage> &msg) {
-    int32_t rtpSocket, rtcpSocket;
-    CHECK(msg->findInt32("rtp-socket", &rtpSocket));
-    CHECK(msg->findInt32("rtcp-socket", &rtcpSocket));
-
+    int32_t index;
+    CHECK(msg->findInt32("index", &index));
+	Mutex::Autolock autoLock(mStreamLock);
     list<StreamInfo>::iterator it = mStreams.begin();
     while (it != mStreams.end()
-           && (it->mRTPSocket != rtpSocket || it->mRTCPSocket != rtcpSocket)) {
+           && (it->mIndex != index)) {
         ++it;
     }
 
@@ -229,13 +165,11 @@ void ARTPConnection::onRemoveStream(const sp<AMessage> &msg) {
     }
 
     mStreams.erase(it);
+	if(mStreams.size()==0)
+		mThreadRunFlag = false;
 }
 
 
-void ARTPConnection::onSendPacket(const sp<AMessage> &msg) {
-	
-	
-}
 
 void ARTPConnection::makeRTPHeader(RTPHeader* h,uint8_t out[12])
 {
@@ -290,26 +224,6 @@ bool ARTPConnection::isFirstNalu(uint8_t* data,size_t length) {
 }
 
 
-
-status_t ARTPConnection::sendRTP(StreamInfo *s,const sp<ABuffer> &buffer) {
-
-    ssize_t nbytes = send(
-            s->mRTPSocket,
-            buffer->data(),
-            buffer->capacity(),
-            0,);
-
-    if (nbytes < 0) {
-        return -1;
-    }
-
-    LOGI(LOG_TAG,"send %d bytes.", buffer->size());
-
-    //return err;
-}
-
-
-
 void ARTPConnection::setSource(ARTPSource* src)
 {
 	mRTPSource = src;
@@ -319,17 +233,20 @@ status_t ARTPConnection::RTPPacket(sp<ABuffer> buf)
 {
 	static uint32_t timeStamp = 0;
 	static uint16_t seqNum;
-	uint32_t bytes;
+	static uint8_t sendbuf[UDP_MAX_SIZE];
+	uint32_t bytes; 
 	//static sp<ABuffer> preBuf = new ABuffer(MTU_SIZE);
 	//sp<ABuffer> swapBuf;
-	char* nalu_payload;
+	uint8_t* nalu_payload;
 	//RTP header 12 bytes
 	if(isFirstNalu(buf->data(),buf->size()))
 		timeStamp+=(unsigned int)(90000.0 / mRTPSource->mFramerate);
 	NALU_t nalu;
-
-while(1) 
-{
+	RTP_FIXED_HEADER* rtp_hdr;
+	NALU_HEADER* nalu_hdr;
+	FU_INDICATOR* fu_ind;
+	FU_HEADER* fu_hdr;
+	
 	memset(&nalu,0,sizeof(NALU_t));
 	GetAnnexbNALU(&nalu,buf);//每执行一次，文件的指针指向本次找到的NALU的末尾，下一个位置即为下个NALU的起始码0x000001
 	dump(&nalu);//输出NALU长度和TYPE
@@ -363,11 +280,11 @@ while(1)
 		//timeStamp = timeStamp + timestamp_increse;
 		
 		bytes = nalu.len + 12 ; //获得sendbuf的长度,为nalu的长度（包含NALU头但除去起始前缀）加上rtp_header的固定长度12字节
-		//send(socket1,sendbuf,bytes,0);//发送RTP包
-		//Sleep(100);
+		sendRTPPacket(sendbuf,bytes);//send(socket1,sendbuf,bytes,0);//发送RTP包
+
 	}else{
 		int packetNum = nalu.len/UDP_MAX_SIZE;
-		if (n->len%UDP_MAX_SIZE != 0)
+		if (nalu.len%UDP_MAX_SIZE != 0)
 			packetNum ++;
 
 		int lastPackSize = nalu.len - (packetNum-1)*UDP_MAX_SIZE;
@@ -398,7 +315,7 @@ while(1)
 		nalu_payload=&sendbuf[14];//同理将sendbuf[14]赋给nalu_payload
 		memcpy(nalu_payload,nalu.buf+1,UDP_MAX_SIZE);//去掉NALU头
 		bytes=UDP_MAX_SIZE+14;//获得sendbuf的长度,为nalu的长度（除去起始前缀和NALU头）加上rtp_header，fu_ind，fu_hdr的固定长度14字节
-		//send( socket1, sendbuf, bytes, 0 );//发送RTP包
+		sendRTPPacket(sendbuf,bytes);//send( socket1, sendbuf, bytes, 0 );//发送RTP包
 
 		//发送中间的FU，S=0，E=0，R=0
 		for(packetIndex=2;packetIndex<packetNum;packetIndex++)
@@ -423,7 +340,7 @@ while(1)
 			nalu_payload=&sendbuf[14];//同理将sendbuf[14]的地址赋给nalu_payload
 			memcpy(nalu_payload,nalu.buf+(packetIndex-1)*UDP_MAX_SIZE+1,UDP_MAX_SIZE);//去掉起始前缀的nalu剩余内容写入sendbuf[14]开始的字符串。
 			bytes=UDP_MAX_SIZE+14;//获得sendbuf的长度,为nalu的长度（除去原NALU头）加上rtp_header，fu_ind，fu_hdr的固定长度14字节
-			//send( socket1, sendbuf, bytes, 0 );//发送rtp包				
+			sendRTPPacket(sendbuf,bytes);//send( socket1, sendbuf, bytes, 0 );//发送rtp包				
 		}
 
 		//发送最后一个的FU，S=0，E=1，R=0
@@ -447,16 +364,31 @@ while(1)
 		nalu_payload=&sendbuf[14];//同理将sendbuf[14]的地址赋给nalu_payload
 		memcpy(nalu_payload,nalu.buf+(packetIndex-1)*UDP_MAX_SIZE+1,lastPackSize-1);//将nalu最后剩余的-1(去掉了一个字节的NALU头)字节内容写入sendbuf[14]开始的字符串。
 		bytes=lastPackSize-1+14;//获得sendbuf的长度,为剩余nalu的长度l-1加上rtp_header，FU_INDICATOR,FU_HEADER三个包头共14字节
-		//send( socket1, sendbuf, bytes, 0 );//发送rtp包		
+		sendRTPPacket(sendbuf,bytes);//send( socket1, sendbuf, bytes, 0 );//发送rtp包		
 	}
+	return 0;
+
 
 }
 
-}
-
-void ARTPConnection::sendRTPPacket()
+void ARTPConnection::sendRTPPacket(const uint8_t* buf ,size_t bytes)
 {
+	Mutex::Autolock autoLock(mStreamLock);
+    list<StreamInfo>::iterator it = mStreams.begin();
+    while (it != mStreams.end()) 
+		{
+			ssize_t n = sendto(
+					it->mRTPSocket, buf, bytes, 0,
+					(const struct sockaddr *)&it->mRemoteRTPAddr, sizeof(it->mRemoteRTPAddr));	
+			//CHECK_EQ(n, (ssize_t)buffer->size());
+	        ++it;
+	    }
 
+    if (it == mStreams.end()) {
+        TRESPASS();
+    }
+
+    mStreams.erase(it);
 }
 
 
@@ -468,12 +400,31 @@ int ARTPConnection::GetAnnexbNALU (NALU_t *nalu,const sp<ABuffer> &buf)
 	nalu->forbidden_bit = nalu->buf[0] & 0x80;		//1 bit
 	nalu->nal_reference_idc = nalu->buf[0] & 0x60;	//2 bit
 	nalu->nal_unit_type = (nalu->buf[0]) & 0x1f;	//5 bit
-	return 0;//返回两个开始字符之间间隔的字节数，即包含有前缀的NALU的长度
+	return 0;
 }
 
 void ARTPConnection::dump(NALU_t *n)
 {
 	if (!n)return;
 	LOGI(LOG_TAG,"nal length:%d nal_unit_type: %x\n", n->len,n->nal_unit_type);
+}
+
+void* ARTPConnection::threadloop(void* arg)
+{
+	ARTPConnection* connptr = (ARTPConnection*)arg;
+	sp<ABuffer> buf;
+	while(connptr->mThreadRunFlag)
+		{
+			if(connptr->mRTPSource->outputQPop(buf)>=0)
+				{
+					if(!connptr->RTPPacket(buf))
+						{
+						
+						}
+					buf->setRange(0,0);
+					connptr->mRTPSource->outputQPush(buf);
+				}
+			
+		}
 }
 
