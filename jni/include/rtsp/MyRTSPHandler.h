@@ -13,7 +13,8 @@
 #include "foundation/AHandler.h"
 #include "foundation/AMessage.h"
 #include "foundation/ADebug.h"
-#include "ARTSPConnection.h"
+#include "rtsp/ARTSPConnection.h"
+#include "rtsp/ARTPConnection.h"
 
 enum ReqMethod
 {
@@ -37,6 +38,7 @@ struct MyRTSPHandler : public AHandler
 	int getHostIP (char addressBuffer[40]) ;
 	void makeSDP(uint8_t* SPS,uint32_t SPS_len,uint8_t* PPS,uint32_t PPS_len);
 	bool mRunningFlag;
+	void setRTPConnection(ARTPConnection* RTPConn);
 	map<uint32_t,ARTSPConnection*> mSessions;//<session_id,ARTSPConnection pointer>
 protected:
 static void* NewSession(void* arg);
@@ -48,8 +50,6 @@ virtual void onMessageReceived(const sp<AMessage> &msg);
 	
 	void getDigest(const char* NONCE,const char* public_method,AString *result);
 
-	static unsigned MakePortPair(int *rtpSocket, int *rtcpSocket, struct sockaddr_in addr) ;
-	
 	int mSocket;
 	int mSocketAccept;
     uint32_t session_id;
@@ -65,7 +65,7 @@ private:
 	char mMD5part1[33];
 	char mMD5part3[33];
 	AString mURI;
-
+	ARTPConnection* mRTPConnPt;
 	bool isAuthenticate(const char* NONCE,AString& tmpStr,const char* method);
 
 	void sendUnauthenticatedResponse(ARTSPConnection* Conn,int cseqNum);	
@@ -84,9 +84,10 @@ WWW-Authenticate: Digest realm="StreamingServer", nonce="a72a7266d6f903a8384b874
 	}
 	
 	unsigned MakePortPair(
-			int *rtpSocket, int *rtcpSocket, struct sockaddr_in addr) 
+			int *rtpSocket, int *rtcpSocket) 
 	{
 		unsigned port ;
+		struct sockaddr_in addr;
 		*rtpSocket = socket(AF_INET, SOCK_DGRAM, 0);
 		CHECK_GE(*rtpSocket, 0);
 	

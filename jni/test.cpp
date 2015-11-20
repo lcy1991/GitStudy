@@ -60,36 +60,14 @@ int main()
 	printf("abc\n");
 	bits = fopen("test.264","r");
 #if 1
-	uint32_t i;
-	char* tmp = "1234567890\r\n1234567";
-	handler_1* handler1 = new handler_1();
-	handler_1* handler2 = new handler_1();
-	ALooper* looper1 =  new ALooper;
-	ALooper* looper2 =  new ALooper;
-	AString* astring = new AString(tmp,19);
-	ssize_t space1 = astring->find("\r\n");
-	LOGI("log_tag","status: %s %d\n", astring->c_str(),space1);
-		//return 0;
-	looper1->registerHandler(handler1);
-	looper2->registerHandler(handler2);
-	handler1->setTarget(handler2->id());
-	handler2->setTarget(handler1->id());
-	looper1->start();
-	looper2->start();
-	handler1->start(0,0);
-/*	for(i=0;i<100;i++)
-		{
-			handler1->start(0,2*i);
-			handler2->start(0,2*i+1);
-			usleep(1000);
-		}*/
-	sleep(1);
-	delete handler1;
-	delete handler2;
-	delete looper1;
-	delete looper2;
-
+	ALooper looper1;
 	MyRTSPHandler handler_rtsp;
+	ARTPConnection handler_rtp;
+	handler_rtp.setSource(&mysource);
+	handler_rtsp.setRTPConnection(&handler_rtp);
+	looper1.registerHandler(&handler_rtsp);
+	looper1.registerHandler(&handler_rtp);
+	looper1.start();
 	handler_rtsp.StartServer();
 #endif
 #if 0
@@ -108,7 +86,7 @@ void* status;
 pthread_join(idsend,&status);
 pthread_join(idget,&status);
 
-#else
+#endif
 
 #if 0
 ARTPConnection* RTPConn = new ARTPConnection();

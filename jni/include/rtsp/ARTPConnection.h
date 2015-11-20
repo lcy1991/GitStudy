@@ -158,7 +158,8 @@ struct ARTPConnection : public AHandler {
 
 
 
-    ARTPConnection(uint32_t flags = 0);
+    ARTPConnection();
+    virtual ~ARTPConnection();
 
     void addStream(
             int rtpSocket, int rtcpSocket,
@@ -171,15 +172,15 @@ struct ARTPConnection : public AHandler {
     // Creates a pair of UDP datagram sockets bound to adjacent ports
     // (the rtpSocket is bound to an even port, the rtcpSocket to the
     // next higher port).
-    unsigned MakePortPair(
-           int *rtpSocket, int *rtcpSocket, struct sockaddr_in addr);
+    //unsigned MakePortPair(
+    //       int *rtpSocket, int *rtcpSocket, struct sockaddr_in addr);
 
     void fakeTimestamps();
 
 	void setSource(ARTPSource*  src);
 
 protected:
-    virtual ~ARTPConnection();
+
     virtual void onMessageReceived(const sp<AMessage> &msg);
 
 private:

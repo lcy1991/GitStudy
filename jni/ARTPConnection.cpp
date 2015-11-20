@@ -31,6 +31,7 @@
 
 #include <arpa/inet.h>
 #include <sys/socket.h>
+#include <unistd.h>
 
 
 const uint8_t ff_ue_golomb_vlc_code[512]=
@@ -72,8 +73,8 @@ const int64_t ARTPConnection::kSelectTimeoutUs = 1000ll;
 
 
 
-ARTPConnection::ARTPConnection(uint32_t flags)
-    : mFlags(flags),
+ARTPConnection::ARTPConnection()
+    : 
       mPollEventPending(false),
       mThreadRunFlag(false),
       mLastReceiverReportTimeUs(-1) {
@@ -415,6 +416,9 @@ void* ARTPConnection::threadloop(void* arg)
 	sp<ABuffer> buf;
 	while(connptr->mThreadRunFlag)
 		{
+			LOGI(LOG_TAG,"rtp threadloop...");
+			//sleep(1);
+			
 			if(connptr->mRTPSource->outputQPop(buf)>=0)
 				{
 					if(!connptr->RTPPacket(buf))
@@ -424,6 +428,7 @@ void* ARTPConnection::threadloop(void* arg)
 					buf->setRange(0,0);
 					connptr->mRTPSource->outputQPush(buf);
 				}
+			else LOGI(LOG_TAG,"RTP Source is empty");
 			
 		}
 }

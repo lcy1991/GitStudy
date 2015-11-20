@@ -99,6 +99,11 @@ struct ARTSPConnection : public AHandler {
     int mSocket;	
 	pthread_t mTID;
 	struct sockaddr mClient_addr;
+	int rtpSocket;
+	int rtcpSocket;
+	unsigned mLocalRtpPort;
+	unsigned mRemoteRtpPort;
+
 //	ARTPConnection mRTPConn;
 
 protected:
@@ -111,7 +116,6 @@ private:
         BASIC,
         DIGEST
     };
-//	ARTPConnection RTPConn;
 
     static const int64_t kSelectTimeoutUs;
 
