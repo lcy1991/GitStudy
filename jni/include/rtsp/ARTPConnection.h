@@ -162,8 +162,8 @@ struct ARTPConnection : public AHandler {
     virtual ~ARTPConnection();
 
     void addStream(
-            int rtpSocket, int rtcpSocket,
-            size_t index,struct sockaddr_in* address);
+        int rtpSocket, int rtcpSocket,
+        size_t index,const char* address,int remoutPort);
 
     void removeStream(int index);
 
@@ -178,6 +178,8 @@ struct ARTPConnection : public AHandler {
     void fakeTimestamps();
 
 	void setSource(ARTPSource*  src);
+
+	bool getStatus();
 
 protected:
 

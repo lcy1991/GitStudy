@@ -42,6 +42,8 @@ struct MyRTSPHandler : public AHandler
 	map<uint32_t,ARTSPConnection*> mSessions;//<session_id,ARTSPConnection pointer>
 protected:
 static void* NewSession(void* arg);
+static void* ServerThread(void* arg);
+
 virtual void onMessageReceived(const sp<AMessage> &msg);
 
 	void onReceiveRequest(const sp<AMessage> &msg);

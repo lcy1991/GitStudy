@@ -24,7 +24,7 @@
 #include "foundation/ADebug.h"
 #include "foundation/AMessage.h"
 
-#include <arpa/inet.h>
+
 #include <fcntl.h>
 #include <unistd.h>
 #include <netdb.h>

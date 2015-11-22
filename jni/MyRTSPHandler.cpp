@@ -201,12 +201,31 @@ void MyRTSPHandler::onReceiveRequest(const sp<AMessage> &msg)
 												Conn->mRemoteRtpPort = atoi(rtpPort.c_str());
 												LOGI(LOG_TAG,"client rtp port:%d ",Conn->mRemoteRtpPort);
 												Conn->mLocalRtpPort = MakePortPair(&Conn->rtpSocket,&Conn->rtcpSocket);
-												struct sockaddr_in* tmpaddr = (struct sockaddr_in*)&Conn->mClient_addr;
-												tmpaddr->sin_port = htons(Conn->mRemoteRtpPort);
-												mRTPConnPt->addStream(Conn->mLocalRtpPort,Conn->mLocalRtpPort+1,Conn->mSessionID,(struct sockaddr_in*)&Conn->mClient_addr);
+												//struct sockaddr_in* tmpaddr = (struct sockaddr_in*)&Conn->mClient_addr;
+												//tmpaddr->sin_port = htons(Conn->mRemoteRtpPort);
+												//mRTPConnPt->addStream(Conn->mLocalRtpPort,Conn->mLocalRtpPort+1,Conn->mSessionID,(struct sockaddr_in*)&Conn->mClient_addr);
 												if(Conn->mLocalRtpPort > 0)
 													{
-														
+														response.append("RTSP/1.0 200 OK\r\n");
+														response.append("CSeq: ");
+														response.append(cseqNum);
+														response.append("\r\n");
+														response.append("Session: ");
+														response.append(Conn->mSessionID);
+														response.append("\r\n");
+														response.append("Transport: RTP/AVP;unicast;client_port=");
+														response.append(Conn->mRemoteRtpPort);
+														response.append("-");
+														response.append(Conn->mRemoteRtpPort+1);
+														response.append(";server_port=");
+														response.append(Conn->mLocalRtpPort);
+														response.append("-");
+														response.append(Conn->mLocalRtpPort+1);
+														response.append("\r\n\r\n");
+														LOGI(LOG_TAG,"%s",response.c_str());
+														Conn->sendResponse(response.c_str());
+														ReqMethodNum = OPTION;
+														break;
 													}
 												
 											}
@@ -231,16 +250,26 @@ void MyRTSPHandler::onReceiveRequest(const sp<AMessage> &msg)
 								if(!isAuthenticate(Conn->getNonce(),tmpStr,"PLAY"))
 									sendUnauthenticatedResponse(Conn,cseqNum);
 								else
-									{/*
+									{
+										AString range;
+										char ipAddr[16];
+									    msg->findString("Range",&range);
 										LOGI(LOG_TAG,"%s","PLAY Authenticate pass\n");
-										//Transport:RTP/AVP;unicast;client_port=62418-62419
-										int rtpsocket;
-										struct sockaddr_in ser_addr;
-										ser_addr = (sockaddr_in)Conn->mClient_addr;
-									    //memset(&ser_addr, 0, sizeof(ser_addr));  
-									    ser_addr.sin_family = AF_INET;   
-									    ser_addr.sin_port = htons(SERVER_PORT);  
-									    sock_fd = socket(AF_INET, SOCK_STREAM, 0);  */
+										
+										response.append("RTSP/1.0 200 OK\r\n");
+										response.append("CSeq: ");
+										response.append(cseqNum);
+										response.append("\r\n");
+										response.append("Range: ");
+										response.append(range.c_str());
+										response.append("\r\n\r\n");
+										LOGI(LOG_TAG,"%s",response.c_str());
+										Conn->sendResponse(response.c_str());//
+										ReqMethodNum = PLAY;
+										strcpy(ipAddr,inet_ntoa(Conn->mClient_addr.sin_addr));  
+										mRTPConnPt->addStream(Conn->rtpSocket,Conn->rtcpSocket,Conn->mSessionID,ipAddr,Conn->mRemoteRtpPort);	//Conn->mRemoteRtpPort									
+										break;
+
 									}
 							}					
 					}				
@@ -287,6 +316,9 @@ static void MakeSocketBlocking(int s, bool blocking) {
 
 void MyRTSPHandler::StartServer()
 {
+	pthread_create(&mtempTID,NULL,ServerThread,(void *)this);		
+	return;
+#if 0	
 	//mlooper.registerHandler(this);
 	mlooper.start();
     mSocket = socket(AF_INET, SOCK_STREAM, 0);
@@ -334,8 +366,71 @@ void MyRTSPHandler::StartServer()
 			//pthread_create(&mtempTID,NULL,NewSession,(void *)this);		
 			LOGE(LOG_TAG,"mtempSessionID[%d]\n",mtempSessionID);			
 		}
+#endif	
 
 }
+
+
+
+void* MyRTSPHandler::ServerThread(void* arg)
+{
+	//mlooper.registerHandler(this);
+	MyRTSPHandler* handpt = (MyRTSPHandler*)arg;
+	handpt->mlooper.start();
+    handpt->mSocket = socket(AF_INET, SOCK_STREAM, 0);
+	handpt->mRunningFlag = true;
+    MakeSocketBlocking(handpt->mSocket, true);
+
+    struct sockaddr_in server_addr,peerAddr;
+	struct sockaddr_in addr;
+    socklen_t addrlen,peerLen ;
+    memset(server_addr.sin_zero, 0, sizeof(server_addr.sin_zero));
+    server_addr.sin_family = AF_INET;
+    server_addr.sin_addr.s_addr = htons(INADDR_ANY); ;
+    server_addr.sin_port = htons(RTSP_PORT);
+	LOGI(LOG_TAG,"rtsp StartServer\n");
+	if(-1 == (bind(handpt->mSocket, (struct sockaddr*)&server_addr, sizeof(server_addr)))) 
+	  { 
+		LOGE(LOG_TAG,"Server Bind Failed:"); 
+		//exit(1); 
+		return NULL;
+	  } 
+	// socket监听
+	int err;
+	err = listen(handpt->mSocket, 15);//使主动连接套接字变成监听套接字
+	if(err < 0){
+
+		//mState = DISCONNECTED;
+	}
+	LOGI(LOG_TAG,"rtsp Start listening\n");
+	while(handpt->mRunningFlag)
+		{
+		   //mSocketAccept需要锁保护
+		    //pthread_mutex_lock(&mMutex);
+		    char ipAddr[16];
+		    memset(&addr,0,sizeof(struct sockaddr));
+			addrlen = sizeof(struct sockaddr);
+		    LOGI(LOG_TAG,"rtsp Start accept\n");
+			handpt->mSocketAccept = accept(handpt->mSocket,(struct sockaddr *)&addr,&addrlen);
+			strcpy(ipAddr,inet_ntoa(addr.sin_addr));  
+			LOGI(LOG_TAG,"connected peer address = %s:%d\n",ipAddr, ntohs(addr.sin_port));
+			
+			handpt->mtempSessionID++;
+			
+			ARTSPConnection* rtspConn = new ARTSPConnection();
+			rtspConn->mClient_addr = addr;
+			handpt->mSessions.insert(make_pair(handpt->mtempSessionID, rtspConn));
+			handpt->mlooper.registerHandler(rtspConn);
+			rtspConn->StartListen(handpt->mSocketAccept,handpt->id(),handpt->mtempSessionID);
+
+
+			
+			//pthread_create(&mtempTID,NULL,NewSession,(void *)this);		
+			LOGE(LOG_TAG,"mtempSessionID[%d]\n",handpt->mtempSessionID);			
+		}
+
+}
+
 
 /*
 session_id
@@ -397,6 +492,7 @@ void MyRTSPHandler::getDigest(const char* NONCE,const char* public_method,AStrin
 #if 1
 int MyRTSPHandler::getHostIP (char addressBuffer[40]) 
 {
+	//sprintf(addressBuffer,"%s","192.168.1.107");
 	sprintf(addressBuffer,"%s","127.0.0.1");
 	return 0;
 }

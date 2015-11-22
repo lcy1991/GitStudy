@@ -24,6 +24,7 @@
 #include "foundation/StrongPointer.h"
 #include <sys/socket.h>
 //#include "rtsp/ARTPConnection.h"
+#include <arpa/inet.h>
 
 #include <map>
 #include <pthread.h>
@@ -98,13 +99,11 @@ struct ARTSPConnection : public AHandler {
     int32_t mSessionID;
     int mSocket;	
 	pthread_t mTID;
-	struct sockaddr mClient_addr;
+	struct sockaddr_in mClient_addr;
 	int rtpSocket;
 	int rtcpSocket;
 	unsigned mLocalRtpPort;
 	unsigned mRemoteRtpPort;
-
-//	ARTPConnection mRTPConn;
 
 protected:
     

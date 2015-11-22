@@ -87,14 +87,15 @@ ARTPConnection::~ARTPConnection() {
 
 void ARTPConnection::addStream(
         int rtpSocket, int rtcpSocket,
-        size_t index,struct sockaddr_in* address) 
+        size_t index,const char* address,int remoutPort) 
 {
 	LOGI(LOG_TAG,"add Stream index %d",index);
     sp<AMessage> msg = new AMessage(kWhatAddStream, id());
     msg->setInt32("rtp-socket", rtpSocket);
     msg->setInt32("rtcp-socket", rtcpSocket);
+	msg->setInt32("RemoteRTPPort", remoutPort);
     msg->setInt32("index", index);
-	msg->setPointer("RemoteRTPAddr",(void*)address);
+	msg->setString("RemoteRTPAddr",address,strlen(address));
     msg->post();
 }
 
@@ -132,19 +133,22 @@ void ARTPConnection::onAddStream(const sp<AMessage> &msg) {
     mStreams.push_back(StreamInfo());
     StreamInfo* info = &*--mStreams.end();
     int32_t s;
+	AString ipaddr;
+	struct sockaddr_in tmpaddr;
+	bzero(&tmpaddr,sizeof(tmpaddr));	
+	tmpaddr.sin_family=AF_INET;  
     CHECK(msg->findInt32("rtp-socket", &s));
     info->mRTPSocket = s;
     CHECK(msg->findInt32("rtcp-socket", &s));
     info->mRTCPSocket = s;
 	CHECK(msg->findInt32("index", &s));
     info->mIndex = s;
+	CHECK(msg->findString("RemoteRTPAddr", &ipaddr));
+	tmpaddr.sin_addr.s_addr=inet_addr(ipaddr.c_str());
+	CHECK(msg->findInt32("RemoteRTPPort", &s));	
+	tmpaddr.sin_port=htons(s); 	
+	info->mRemoteRTPAddr = tmpaddr;
 	
-	void* RTPAddr;
-	CHECK(msg->findPointer("RemoteRTPAddr", &RTPAddr));
-	memset(&info->mRemoteRTPAddr, 0, sizeof(info->mRemoteRTPAddr));
-	struct sockaddr_in* tmpptr;
-	tmpptr = static_cast<struct sockaddr_in *>(RTPAddr);
-	info->mRemoteRTPAddr = *tmpptr;
 	if(mStreams.size()==1)
 		{
 			mThreadRunFlag = true;
@@ -152,7 +156,7 @@ void ARTPConnection::onAddStream(const sp<AMessage> &msg) {
 			pthread_create(&id,NULL,threadloop,(void*)this);
 			LOGI(LOG_TAG,"Create RTP transthread");
 		}
-	LOGI(LOG_TAG,"rtp connection add stream %d",info->mIndex);
+	LOGI(LOG_TAG,"rtp connection add stream:%d ip:port %s:%d",info->mIndex,inet_ntoa(info->mRemoteRTPAddr.sin_addr),ntohs(info->mRemoteRTPAddr.sin_port));
 }
 
 void ARTPConnection::onRemoveStream(const sp<AMessage> &msg) {
@@ -387,7 +391,7 @@ void ARTPConnection::sendRTPPacket(const uint8_t* buf ,size_t bytes)
 					it->mRTPSocket, buf, bytes, 0,
 					(const struct sockaddr *)&it->mRemoteRTPAddr, sizeof(it->mRemoteRTPAddr));	
 			//CHECK_EQ(n, (ssize_t)buffer->size());
-			if(n!=bytes)LOGE(LOG_TAG,"socket send rtp error!");
+			if(n!=bytes)LOGE(LOG_TAG,"socket send rtp error %d!",n);
 	        ++it;
 	    }
 }
@@ -409,6 +413,12 @@ void ARTPConnection::dump(NALU_t *n)
 	if (!n)return;
 	LOGI(LOG_TAG,"nal length:%d nal_unit_type: %x\n", n->len,n->nal_unit_type);
 }
+
+bool ARTPConnection::getStatus()
+{
+	return mThreadRunFlag;
+}
+
 
 void* ARTPConnection::threadloop(void* arg)
 {

@@ -115,6 +115,10 @@ RTPConn->addStream(rtpsock,rtcpsock,0,&address);
 sp<ABuffer> tmpbuf;
 int Len;
 int i=0;
+while(!handler_rtp.getStatus())
+{
+	usleep(2000);
+}
 while(!feof(bits))
 {
 	if(mysource.inputQPop(tmpbuf)>=0)
