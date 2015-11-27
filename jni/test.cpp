@@ -39,14 +39,7 @@ void* getbuf(void* arg)
 		{
 			//sprintf(neirong,"neirong %d",i);
 			if(mysource.outputQPop(buf)>=0)
-				{
-			/*		if(buf->size()==0)
-						{
-							buf->setRange(0,0);
-							mysource.outputQPush(buf);
-							continue;
-						}
-			*/			
+				{			
 					memcpy(neirong,buf->data(),buf->size());
 					printf("%s\n",neirong);
 					buf->setRange(0,0);
@@ -57,8 +50,8 @@ void* getbuf(void* arg)
 FILE* bits;
 int main()
 {
-	printf("abc\n");
-	bits = fopen("test.264","r");
+	bits = fopen("vivotest.264","r");
+
 #if 1
 	ALooper looper1;
 	MyRTSPHandler handler_rtsp;
@@ -74,7 +67,7 @@ int main()
 pthread_t idsend;
 pthread_t idget;
 
-int i,ret;
+int i,ret;b
 
 
 ret=pthread_create(&idsend,NULL,sendbuf,NULL);
@@ -119,23 +112,24 @@ while(!handler_rtp.getStatus())
 {
 	usleep(2000);
 }
-while(!feof(bits))
+while(feof(bits)==0)
 {
 	if(mysource.inputQPop(tmpbuf)>=0)
 		{
 			Len = GetAnnexbNALU(tmpbuf);
 			tmpbuf->setRange(0,Len);
-			printf("get a NALU length:%d NUM:%d\n",Len,i++);
+			LOGI(LOG_TAG,"get a NALU length:%d NUM:%d\n",Len,i++);
 			mysource.inputQPush(tmpbuf);
 		}
 }
 
 
-
+LOGI(LOG_TAG,"END");
 
 
 
 	return 0;
+
 }
 
 static int FindStartCode2 (unsigned char *Buf)
@@ -161,7 +155,7 @@ int GetAnnexbNALU (sp<ABuffer> nalu)
 //	unsigned char *Buf;
 	int info2,info3,startcodeprefix_len,len;
 
-	unsigned char Buf[50000];
+	static unsigned char Buf[50000];
 
 	startcodeprefix_len=3;//初始化码流序列的开始字符为3个字节
 
@@ -207,9 +201,11 @@ int GetAnnexbNALU (sp<ABuffer> nalu)
 	{
 		if (feof (bits))//判断是否到了文件尾
 		{
+			//return 0;
 			len = (pos-1)- startcodeprefix_len;
 			memcpy (nalu->data(), &Buf[startcodeprefix_len], len);     
 			//free(Buf);
+			printf("lcy 1991 len %d\n",len);
 			return pos-1;
 		}
 		Buf[pos++] = fgetc (bits);//读一个字节到BUF中
@@ -236,6 +232,7 @@ int GetAnnexbNALU (sp<ABuffer> nalu)
 	len = (pos+rewind)-startcodeprefix_len;
 	memcpy (nalu->data(), &Buf[startcodeprefix_len], len);//拷贝一个完整NALU，不拷贝起始前缀0x000001或0x00000001
 	//free(Buf);
+	printf("memcpy2\n");
 
 	return (pos+rewind);//返回两个开始字符之间间隔的字节数，即包含有前缀的NALU的长度
 }

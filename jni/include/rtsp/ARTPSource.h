@@ -10,7 +10,7 @@
 using namespace std;
 struct MyQueue
 {
-	MyQueue();
+	MyQueue(uint32_t MaxBufNum,uint32_t bufSize);
 	~MyQueue();
 	int push(const sp<ABuffer> &buf);
 	int pop(sp<ABuffer> &buf);
@@ -20,6 +20,7 @@ struct MyQueue
 private:
 	queue<sp<ABuffer> > mBufQue;
 	uint32_t mEmptyBufSize;
+	uint32_t mMaxBufSize;
 };
 
 
@@ -37,8 +38,8 @@ struct ARTPSource
 private:
 	uint32_t mBufSize;
 	uint32_t mBufNum;
-	MyQueue mInputQueue;
-	MyQueue mOutputQueue;
+	MyQueue* mInputQueue;
+	MyQueue* mOutputQueue;
 	MyQueue* pInInputQ;
 	MyQueue* pOutOutputQ;	
 	Mutex mOutputQLock;

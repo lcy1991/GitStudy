@@ -425,21 +425,19 @@ void* ARTPConnection::threadloop(void* arg)
 	ARTPConnection* connptr = (ARTPConnection*)arg;
 	sp<ABuffer> buf;
 	while(connptr->mThreadRunFlag)
-		{
-			LOGI(LOG_TAG,"rtp threadloop...");
-			//sleep(1);
-			
+		{	
 			if(connptr->mRTPSource->outputQPop(buf)>=0)
 				{
 					if(!connptr->RTPPacket(buf))
 						{
 						
 						}
+					LOGI(LOG_TAG,"send a nalu");	
 					buf->setRange(0,0);
 					connptr->mRTPSource->outputQPush(buf);
+					usleep(5000);
 				}
-			else LOGI(LOG_TAG,"RTP Source is empty");
-			
+			else LOGI(LOG_TAG,"RTP Source is empty");	
 		}
 }
 
