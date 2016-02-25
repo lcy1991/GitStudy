@@ -432,10 +432,9 @@ void* ARTPConnection::threadloop(void* arg)
 						{
 						
 						}
-					LOGI(LOG_TAG,"send a nalu");	
 					buf->setRange(0,0);
 					connptr->mRTPSource->outputQPush(buf);
-					usleep(5000);
+					usleep(10000);
 				}
 			else LOGI(LOG_TAG,"RTP Source is empty");	
 		}

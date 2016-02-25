@@ -15,7 +15,6 @@
  */
 
 #ifndef A_STRING_H_
-
 #define A_STRING_H_
 
 #include <sys/types.h>

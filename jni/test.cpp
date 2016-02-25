@@ -123,6 +123,7 @@ while(feof(bits)==0)
 		}
 }
 
+sleep(10);
 
 LOGI(LOG_TAG,"END");
 

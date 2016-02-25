@@ -102,69 +102,7 @@ void ARTSPConnection::onMessageReceived(const sp<AMessage> &msg) {
     }
 }
 
-// static
-/*
-bool ARTSPConnection::ParseURL(
-        const char *url, AString *host, unsigned *port, AString *path,
-        AString *user, AString *pass) {
-    host->clear();
-    *port = 0;
-    path->clear();
-    user->clear();
-    pass->clear();
 
-    if (strncasecmp("rtsp://", url, 7)) {
-        return false;
-    }
-
-    const char *slashPos = strchr(&url[7], '/');
-
-    if (slashPos == NULL) {
-        host->setTo(&url[7]);
-        path->setTo("/");
-    } else {
-        host->setTo(&url[7], slashPos - &url[7]);
-        path->setTo(slashPos);
-    }
-
-    ssize_t atPos = host->find("@");
-
-    if (atPos >= 0) {
-        // Split of user:pass@ from hostname.
-
-        AString userPass(*host, 0, atPos);
-        host->erase(0, atPos + 1);
-
-        ssize_t colonPos = userPass.find(":");
-
-        if (colonPos < 0) {
-            *user = userPass;
-        } else {
-            user->setTo(userPass, 0, colonPos);
-            pass->setTo(userPass, colonPos + 1, userPass.size() - colonPos - 1);
-        }
-    }
-
-    const char *colonPos = strchr(host->c_str(), ':');
-
-    if (colonPos != NULL) {
-        unsigned long x;
-        if (!ParseSingleUnsignedLong(colonPos + 1, &x) || x >= 65536) {
-            return false;
-        }
-
-        *port = x;
-
-        size_t colonOffset = colonPos - host->c_str();
-        size_t trailing = host->size() - colonOffset;
-        host->erase(colonOffset, trailing);
-    } else {
-        *port = 554;
-    }
-
-    return true;
-}
-*/
 static void MakeSocketBlocking(int s, bool blocking) {
     // Make socket non-blocking.
     int flags = fcntl(s, F_GETFL, 0);
@@ -261,8 +199,6 @@ void ARTSPConnection::onCompleteConnection(const sp<AMessage> &msg) {
         reply->setInt32("result", OK);
         mState = CONNECTED;
 
-
-//        postReceiveReponseEvent();
     }
 
     reply->post();
@@ -311,8 +247,6 @@ void ARTSPConnection::onSendResponse(const sp<AMessage> &msg) {
 
         numBytesSent += (size_t)n;
     }
-	//reply->post();//上一层收到发送结果成功或失败
-//    mPendingRequests.add(cseq, reply);//等待服务器回应，返回发送结果服务器应不做回应，只发送相应
 }
 
 void ARTSPConnection::onReceiveRequest() {  //Server receives clients' requests

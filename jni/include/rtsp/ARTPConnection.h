@@ -169,12 +169,6 @@ struct ARTPConnection : public AHandler {
 
     void injectPacket(int index, const sp<ABuffer> &buffer);
 
-    // Creates a pair of UDP datagram sockets bound to adjacent ports
-    // (the rtpSocket is bound to an even port, the rtcpSocket to the
-    // next higher port).
-    //unsigned MakePortPair(
-    //       int *rtpSocket, int *rtcpSocket, struct sockaddr_in addr);
-
     void fakeTimestamps();
 
 	void setSource(ARTPSource*  src);

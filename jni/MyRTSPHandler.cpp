@@ -22,6 +22,61 @@ uint8_t spset[16] = {0x67, 0x42, 0x80, 0x1E, 0xDA, 0x02, 0x80, 0xF6, 0x80, 0x6D,
 //uint8_t ppset[12] = {0x68 ,0xce ,0x38 ,0x80 ,0x00 ,0x00 ,0x00 ,0x10 ,0x70 ,0x61 ,0x73 ,0x70  };//coolpad
 uint8_t ppset[12] = {0x68, 0xCE, 0x06, 0xE2, 0x00, 0x00, 0x00, 0x10, 0x70, 0x61, 0x73, 0x70};//vivo x710
 
+void bumpSocketBufferSize(int s) {
+		int size = 256 * 1024;
+		CHECK_EQ(setsockopt(s, SOL_SOCKET, SO_RCVBUF, &size, sizeof(size)), 0);
+}
+
+unsigned MakePortPair(
+		int *rtpSocket, int *rtcpSocket) 
+{
+	unsigned port ;
+	struct sockaddr_in addr;
+	*rtpSocket = socket(AF_INET, SOCK_DGRAM, 0);
+	CHECK_GE(*rtpSocket, 0);
+
+	bumpSocketBufferSize(*rtpSocket);
+
+	*rtcpSocket = socket(AF_INET, SOCK_DGRAM, 0);
+	CHECK_GE(*rtcpSocket, 0);
+
+	bumpSocketBufferSize(*rtcpSocket);
+
+	unsigned start = (rand() * 1000)/ RAND_MAX + 15550;
+	start &= ~1;
+
+	for (port = start; port < 65536; port += 2) {
+
+		addr.sin_port = htons(port);
+
+		if (bind(*rtpSocket,
+				 (const struct sockaddr *)&addr, sizeof(addr)) < 0) {
+			continue;
+		}
+
+		addr.sin_port = htons(port + 1);
+
+		if (bind(*rtcpSocket,
+				 (const struct sockaddr *)&addr, sizeof(addr)) == 0) {
+			break;//return port;
+		}
+	}
+
+	addr.sin_port = htons(port);
+	if (connect(*rtpSocket,(const struct sockaddr *)&addr, sizeof(addr)) < 0) {
+		LOGE("MakePort","rtpSocket connect to client failed!");
+		return -1;
+	}
+	
+	addr.sin_port = htons(port + 1);
+	if (connect(*rtcpSocket,(const struct sockaddr *)&addr, sizeof(addr)) < 0) {
+		LOGE("MakePort","rtcpSocket connect to client failed!");
+		return -1;
+	}
+	return port;// return rtp port and rtcp port
+
+}
+
 
 //向服务器发送心跳包
 MyRTSPHandler::MyRTSPHandler()
@@ -46,7 +101,7 @@ MyRTSPHandler::MyRTSPHandler()
 }
 MyRTSPHandler::~MyRTSPHandler()
 {
-
+	close(mSocket);
 }
 void MyRTSPHandler::setRTPConnection(ARTPConnection* RTPConn)
 {
@@ -204,9 +259,6 @@ void MyRTSPHandler::onReceiveRequest(const sp<AMessage> &msg)
 												Conn->mRemoteRtpPort = atoi(rtpPort.c_str());
 												LOGI(LOG_TAG,"client rtp port:%d ",Conn->mRemoteRtpPort);
 												Conn->mLocalRtpPort = MakePortPair(&Conn->rtpSocket,&Conn->rtcpSocket);
-												//struct sockaddr_in* tmpaddr = (struct sockaddr_in*)&Conn->mClient_addr;
-												//tmpaddr->sin_port = htons(Conn->mRemoteRtpPort);
-												//mRTPConnPt->addStream(Conn->mLocalRtpPort,Conn->mLocalRtpPort+1,Conn->mSessionID,(struct sockaddr_in*)&Conn->mClient_addr);
 												if(Conn->mLocalRtpPort > 0)
 													{
 														response.append("RTSP/1.0 200 OK\r\n");
@@ -286,6 +338,15 @@ void MyRTSPHandler::onReceiveRequest(const sp<AMessage> &msg)
 		if (strcmp(method.c_str(),"TEARDOWN")==0)
 			{
 				ReqMethodNum = TEARDOWN;
+				int32_t tmpID = Conn->mSessionID;
+				mRTPConnPt->removeStream(Conn->mSessionID);
+				response.append("RTSP/1.0 200 OK\r\n");
+				response.append("CSeq: ");
+				response.append(cseqNum);
+				response.append("\r\n\r\n");
+				msg->setWhat(kwhatCloseSession);
+				msg->post();
+				LOGI(LOG_TAG,"TEARDOWN session %d",tmpID);
 				break;
 			}
 			
@@ -495,7 +556,7 @@ void MyRTSPHandler::getDigest(const char* NONCE,const char* public_method,AStrin
 #if 1
 int MyRTSPHandler::getHostIP (char addressBuffer[40]) 
 {
-	sprintf(addressBuffer,"%s","192.168.1.107");
+	sprintf(addressBuffer,"%s","192.168.1.105");
 	//sprintf(addressBuffer,"%s","127.0.0.1");
 	return 0;
 }
